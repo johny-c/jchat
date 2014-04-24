@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN" "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<hibernate-mapping package="common.db.entity">
+    <class name="ChatMessage" table="CHAT_MESSAGES">
+        <id column="CM_SGEN_ID" name="serverGenId" type="integer">
+            <generator class="native"/>
+        </id>
+        <property column="CM_CGEN_ID" name="clientGenId" type="integer"/>
+        <property column="CM_BODY" name="body" type="string"/>
+        <property column="CM_SOURCE_ID" name="sourceUserId" type="integer"/>
+        <property column="CM_TARGET_ID" name="targetUserId" type="integer"/>
+        <property column="CM_TIME_SENT" name="timeSent" type="timestamp"/>
+        <property column="CM_TIME_BY_SERVER" name="timeByServer" type="timestamp"/>
+        <property column="CM_TIME_DELIVERED" name="timeDelivered" type="timestamp"/>
+        <property column="CM_STATUS" name="status"/>
+        <property column="CM_CONV_ID" name="conversationId"/>
+    </class>
+</hibernate-mapping>

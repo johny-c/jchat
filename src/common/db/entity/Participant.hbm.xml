@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN" "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<!-- Generated Apr 8, 2014 1:17:46 AM by Hibernate Tools 3.2.1.GA -->
+<hibernate-mapping package="common.db.entity">
+  <class name="Participant" table="PARTICIPANTS">
+    <id column="P_ID" name="id" type="integer">
+      <generator class="assigned"/>
+    </id>
+    <property name="contactId" type="integer">
+      <column name="P_CONTACT_ID"/>
+    </property>
+    <set inverse="true" name="conversations" table="PARTICIPANT_CONVERSATION">
+      <key column="P_ID"/>
+      <many-to-many class="Conversation" column="C_ID"/>
+    </set>
+  </class>
+</hibernate-mapping>

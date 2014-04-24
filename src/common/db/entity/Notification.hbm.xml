@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN" "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<hibernate-mapping package="common.db.entity">
+    <class name="Notification" table="NOTIFICATIONS">
+        <id column="NTF_ID" name="id" type="integer">
+            <generator class="assigned"/>
+        </id>
+        <property column="NTF_TYPE" name="type"/>
+        <property column="NTF_TIMESTAMP" name="timeStamp" type="timestamp"/>
+        <property column="NTF_STATUS" name="status"/>
+        <property column="NTF_REL_USER_NAME" name="relatedUsername" type="string"/>
+    </class>
+</hibernate-mapping>
