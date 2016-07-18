@@ -1,4 +1,4 @@
 JChat
 =====
 
-A small chat client in Java and Swing
+A chat client in Java and Swing
