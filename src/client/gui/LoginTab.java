@@ -1,17 +1,32 @@
 package client.gui;
 
-import client.pojos.R;
-import client.pojos.UserSettings;
-import common.db.entity.User;
+import client.db.util.DB;
+import client.networking.NetworkManager;
+import client.networking.R;
+import client.tasks.ConnectionTask;
+import common.db.entity.UserAccount;
+import common.db.entity.UserIcon;
 import common.db.entity.UserSession;
-import common.pojos.Conventions;
-import common.pojos.Message;
-import common.pojos.OQueue;
-import common.pojos.Utils;
+import common.utils.Conventions;
+import common.utils.Message;
+import common.utils.MessageType;
+import common.utils.OQueue;
+import common.utils.Utils;
 import java.awt.event.ItemEvent;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.util.List;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.prefs.Preferences;
+import javax.swing.ImageIcon;
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 import org.jasypt.util.password.StrongPasswordEncryptor;
 
 /**
@@ -20,62 +35,35 @@ import org.jasypt.util.password.StrongPasswordEncryptor;
  */
 public class LoginTab extends javax.swing.JPanel implements Observer, Conventions {
 
-    private boolean rememberCredentials;
-    private Message m;
+    private UserAccount inputAccount;
+    private UserAccount matchingAccount;
     private OQueue q;
-
-    @Override
-    public void update(Observable o, Object arg) {
-        if (!arg.equals(LoginTab.class.getSimpleName())) {
-            return;
-        }
-
-        q = (OQueue) o;
-        m = (Message) q.poll();
-
-        switch (m.getCode()) {
-            case LOGIN_RESPONSE:
-                int response = (Integer) m.getContent();
-                if (response == LOGIN_SUCCESS) {
-                    if (rememberCredentials) {
-                        UserSettings.set(UserSettings.USERNAME, R.getU().getUsername());
-                        UserSettings.set(UserSettings.PASSWORD, R.getU().getPassword());
-                    }
-                }
-                break;
-        }
-
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                // Stop the loading animation
-                loadingAnimationLabel.setVisible(false);
-
-                switch (m.getCode()) {
-                    case LOGIN_RESPONSE:
-                        int response = (Integer) m.getContent();
-                        if (response == LOGIN_SUCCESS) {
-                            successfullLogin();
-                        } else {
-                            failedLogin();
-                        }
-                        break;
-
-                    case NEW_USER_SESSION:
-                        successfullLogin();
-                        break;
-                }
-            }
-        });
-
-    }
+    private Message m;
 
     /**
      * Creates new form LoginTab
      */
     public LoginTab() {
         initComponents();
-        R.getImh().subscribe(this);
+        // Check if form needs to be filled due to user preference
+        boolean shouldFillForm = R.getAppPrefs().getBoolean(REMEMBER_CREDENTIALS, DEFAULT_REMEMBER_CREDENTIALS);
+        Integer prefUacId = R.getAppPrefs().getInt(LOGIN_ACCOUNT, DEFAULT_LOGIN_ACCOUNT);
+        List<Integer> acids = DB.getMyAccounts();
+
+        if (shouldFillForm) { // user pref is to remember credentials
+            if (acids != null) {
+                if (acids.size() > 0) {
+                    inputAccount = (UserAccount) DB.get(prefUacId, UserAccount.class);
+                    if (inputAccount == null) {
+                        inputAccount = (UserAccount) DB.get(acids.get(0), UserAccount.class);
+                    }
+
+                    // Having a valid account
+                    usernameField.setText(inputAccount.getUsername());
+                    passwordField.setText(inputAccount.getPassword());
+                }
+            }
+        }
     }
 
     /**
@@ -88,8 +76,8 @@ public class LoginTab extends javax.swing.JPanel implements Observer, Convention
     private void initComponents() {
 
         loginWelcomeLabel = new javax.swing.JLabel();
-        loadingAnimationLabel = new javax.swing.JLabel();
-        loadingAnimationLabel.setVisible(false);
+        loginLAL = new javax.swing.JLabel();
+        loginLAL.setVisible(false);
         loginButton = new javax.swing.JButton();
         loginRememberMeCheckBox = new javax.swing.JCheckBox();
         createAccountButton = new javax.swing.JButton();
@@ -99,12 +87,13 @@ public class LoginTab extends javax.swing.JPanel implements Observer, Convention
         passwordField = new javax.swing.JPasswordField();
         jLabel1 = new javax.swing.JLabel();
         jLabel2 = new javax.swing.JLabel();
+        loginConnLabel = new javax.swing.JLabel();
 
         setBackground(java.awt.Color.white);
         setBorder(javax.swing.BorderFactory.createEmptyBorder(1, 1, 1, 1));
         java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("client/gui/Bundle"); // NOI18N
         setToolTipText(bundle.getString("loginTabToolTip")); // NOI18N
-        setMinimumSize(getMinimumSize());
+        setMinimumSize(new java.awt.Dimension(600, 450));
         setName("Login"); // NOI18N
         setVerifyInputWhenFocusTarget(false);
 
@@ -115,9 +104,9 @@ public class LoginTab extends javax.swing.JPanel implements Observer, Convention
         loginWelcomeLabel.setAlignmentX(0.5F);
         loginWelcomeLabel.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
 
-        loadingAnimationLabel.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        loadingAnimationLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/loading_circle_animation/21.gif"))); // NOI18N
-        loadingAnimationLabel.setText(bundle.getString("loadingAnimationLabel")); // NOI18N
+        loginLAL.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        loginLAL.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/loading_circle_animation/21.gif"))); // NOI18N
+        loginLAL.setText(bundle.getString("loadingAnimationLabel")); // NOI18N
 
         loginButton.setBackground(new java.awt.Color(65, 179, 129));
         loginButton.setForeground(java.awt.Color.white);
@@ -131,13 +120,8 @@ public class LoginTab extends javax.swing.JPanel implements Observer, Convention
         });
 
         loginRememberMeCheckBox.setBackground(getBackground());
+        loginRememberMeCheckBox.setSelected(R.getAppPrefs().getBoolean(REMEMBER_CREDENTIALS, DEFAULT_REMEMBER_CREDENTIALS));
         loginRememberMeCheckBox.setText("Remember me");
-        loginRememberMeCheckBox.setOpaque(true);
-        loginRememberMeCheckBox.addItemListener(new java.awt.event.ItemListener() {
-            public void itemStateChanged(java.awt.event.ItemEvent evt) {
-                loginRememberMeCheckBoxItemStateChanged(evt);
-            }
-        });
 
         createAccountButton.setBackground(new java.awt.Color(78, 110, 187));
         createAccountButton.setForeground(java.awt.Color.white);
@@ -153,9 +137,6 @@ public class LoginTab extends javax.swing.JPanel implements Observer, Convention
         loginErrorLabel.setText(bundle.getString("loginErrorLabel")); // NOI18N
 
         usernameField.setHorizontalAlignment(javax.swing.JTextField.LEFT);
-        usernameField.setText(UserSettings.get(UserSettings.USERNAME, ""));
-
-        passwordField.setText(UserSettings.get(UserSettings.PASSWORD, ""));
 
         jLabel1.setFont(new java.awt.Font("Ubuntu", 0, 15)); // NOI18N
         jLabel1.setForeground(new java.awt.Color(60, 59, 55));
@@ -169,24 +150,27 @@ public class LoginTab extends javax.swing.JPanel implements Observer, Convention
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addGap(233, 233, 233)
+                .addGap(150, 150, 150)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jLabel1)
                     .addComponent(jLabel2))
                 .addGap(6, 6, 6)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
-                        .addComponent(loginErrorLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                        .addContainerGap(180, Short.MAX_VALUE))
+                        .addComponent(loginErrorLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 301, Short.MAX_VALUE)
+                        .addContainerGap(66, Short.MAX_VALUE))
                     .addGroup(layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addComponent(loginWelcomeLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 200, Short.MAX_VALUE)
                             .addComponent(createAccountButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                             .addComponent(loginRememberMeCheckBox, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                             .addComponent(loginButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                            .addComponent(loadingAnimationLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                             .addComponent(passwordField)
-                            .addComponent(usernameField))
+                            .addComponent(usernameField)
+                            .addGroup(layout.createSequentialGroup()
+                                .addComponent(loginLAL)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(loginConnLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
                         .addGap(0, 0, Short.MAX_VALUE))))
         );
         layout.setVerticalGroup(
@@ -205,102 +189,208 @@ public class LoginTab extends javax.swing.JPanel implements Observer, Convention
                 .addGap(12, 12, 12)
                 .addComponent(loginErrorLabel)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(loadingAnimationLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 33, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addComponent(loginLAL, javax.swing.GroupLayout.DEFAULT_SIZE, 33, Short.MAX_VALUE)
+                    .addComponent(loginConnLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(loginButton, javax.swing.GroupLayout.PREFERRED_SIZE, 40, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(loginRememberMeCheckBox)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                 .addComponent(createAccountButton, javax.swing.GroupLayout.PREFERRED_SIZE, 40, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(69, Short.MAX_VALUE))
+                .addContainerGap(63, Short.MAX_VALUE))
         );
 
         getAccessibleContext().setAccessibleParent(this);
     }// </editor-fold>//GEN-END:initComponents
 
     private void loginButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_loginButtonActionPerformed
+        setPaneState(false);
         String usernameInput = usernameField.getText();
         String passwordInput = new String(passwordField.getPassword());
-        if (Utils.isValidUsername(usernameInput)) {
-            if (Utils.isValidPassword(passwordInput)) {
-                // Disable loginButton until a response comes back
-                loginButton.setEnabled(false);
-                // Reset error label in case it was visible
-                loginErrorLabel.setVisible(false);
-                // Show an animation like loading or progress bar of signing in
-                loadingAnimationLabel.setVisible(true);
-                // Compare with locally stored credentials
-                String storedUsername = UserSettings.get(UserSettings.STORED_USERNAME, "");
-                String storedPassword = UserSettings.get(UserSettings.STORED_ENC_PASSWORD, "");
-                if (storedUsername.equals("") || storedPassword.equals("")) {
-                    // Prepare message to be sent
-                    R.getU().setUsername(usernameInput);
-                    R.getU().setPassword(passwordInput);
-                    // Send NORMAL login request to the Server
-                    Message loginRequest = new Message(LOGIN_REQUEST, R.getU());
-                    R.getNm().send(loginRequest);
-                } else {
-                    StrongPasswordEncryptor spe = new StrongPasswordEncryptor();
-                    if (usernameInput.equals(storedUsername) && spe.checkPassword(passwordInput, storedPassword)) {
-                        // Send request for new session token
-                        UserSession us = R.getDb().getLastUserSession();
-                        Message m = new Message(NEW_USER_SESSION_REQUEST, us);
-                        R.getNm().send(m);
-                    } else {
-                        // Unsuccessfull login
-                        failedLogin();
-                    }
+
+        R.log("Username input: " + usernameInput);
+        R.log("Password input: " + passwordInput);
+        if (!Utils.isValidUsername(usernameInput)) {
+            // Invalid username (length)
+            R.log("Invalid username input...");
+            failedLogin();
+            return;
+        }
+
+        List<Integer> storedAccountIds = DB.getMyAccounts();
+        if (storedAccountIds == null) // Compare with locally stored credentials
+        {
+            JOptionPane.showMessageDialog(this,
+                    "You must first create a JChat account.",
+                    "No account found in Database!",
+                    JOptionPane.ERROR_MESSAGE);
+            failedLogin();
+            return;
+        }
+
+        R.log("Found " + storedAccountIds.size() + " accounts in DB");
+        UserAccount storedAccount;
+        for (Integer accountId : storedAccountIds) {
+            storedAccount = (UserAccount) DB.get(accountId, UserAccount.class);
+            R.log("Account " + storedAccount.getId());
+            R.log("Username " + storedAccount.getUsername());
+            R.log("Pw " + storedAccount.getPassword());
+            if (usernameInput.equals(storedAccount.getUsername())) { // found account by username
+                R.log("Username match !");
+
+                // in case form was auto-filled
+                if (passwordInput.equals(storedAccount.getPassword())) {
+                    R.log("Form Credentials match Account " + storedAccount.getId());
+                    matchingLocalAccountFound(storedAccount);
+                    return;
                 }
 
-                return;
+                // in case form was filled by user
+                StrongPasswordEncryptor spe = new StrongPasswordEncryptor();
+                if (spe.checkPassword(passwordInput, storedAccount.getPassword())) {
+                    R.log("User Credentials match Account " + storedAccount.getId());
+                    matchingLocalAccountFound(storedAccount);
+                    return;
+                }
             }
         }
+
+        // No matching account was found
         failedLogin();
     }//GEN-LAST:event_loginButtonActionPerformed
+
+    private void matchingLocalAccountFound(final UserAccount account) {
+        setPaneState(false);
+        // Credentials match account, send new session request
+        account.setPassword("");
+        matchingAccount = account;
+
+        // Send new session request, wait for server's response
+        ConnectionTask connectionTask = new ConnectionTask(loginConnLabel);
+        connectionTask.addPropertyChangeListener(new PropertyChangeListener() {
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                if ("state".equals(evt.getPropertyName())) {
+                    if (evt.getNewValue().equals(SwingWorker.StateValue.DONE)) {
+                        if (NetworkManager.isConnected()) {
+                            loginConnLabel.setText("Sending login request");
+                            UserSession us = DB.getLastUserSession(account.getId());
+                            R.log("Retreived last user session");
+                            Message newSessionRequest = new Message(MessageType.NEW_USER_SESSION_REQUEST, us);
+                            NetworkManager.send(newSessionRequest);
+                            loginConnLabel.setText("Waiting for response");
+                        } else {
+                            loginConnLabel.setText("Could not connect to the Server");
+                            setPaneState(true);
+                        }
+                    }
+                }
+            }
+        });
+        connectionTask.execute();
+
+    }
 
     private void createAccountButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_createAccountButtonActionPerformed
         SignupTab signupTab = new SignupTab();
         R.getMf().getT().addTab("JChat - Signup", JCHAT_LOGO, signupTab, "JChat Signup");
         R.getMf().getT().setSelectedComponent(signupTab);
-        R.getImh().unsubscribe(this);
         R.getMf().getT().remove(LoginTab.this);
     }//GEN-LAST:event_createAccountButtonActionPerformed
 
-    private void loginRememberMeCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_loginRememberMeCheckBoxItemStateChanged
-        if (evt.getStateChange() == ItemEvent.SELECTED) {
-            rememberCredentials = true;
-        } else if (evt.getStateChange() == ItemEvent.DESELECTED) {
-            rememberCredentials = false;
-        }
-    }//GEN-LAST:event_loginRememberMeCheckBoxItemStateChanged
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton createAccountButton;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
-    private javax.swing.JLabel loadingAnimationLabel;
     private javax.swing.JButton loginButton;
+    private javax.swing.JLabel loginConnLabel;
     private javax.swing.JLabel loginErrorLabel;
+    private javax.swing.JLabel loginLAL;
     private javax.swing.JCheckBox loginRememberMeCheckBox;
     private javax.swing.JLabel loginWelcomeLabel;
     private javax.swing.JPasswordField passwordField;
     private javax.swing.JTextField usernameField;
     // End of variables declaration//GEN-END:variables
-    private MainTab mainTab;
+    private WelcomeTab welcomeTab;
 
-    private void successfullLogin() {
-        R.getU().setStatus(User.Status.ONLINE);
-        R.getMf().changeUserStatusIcon("online");
-        R.getImh().unsubscribe(this);
+    // Called when received a new session-login response from server
+    private void successfullLogin() { // UserAccount matchingAccount
 
-        mainTab = new MainTab();
-        R.getMf().getT().addTab("JChat - " + R.getU().getUsernameOrEmail(), JCHAT_LOGO, mainTab, MAIN_TAB_TIP);
-        R.getMf().getT().setSelectedComponent(mainTab);
-        R.getMf().getT().remove(LoginTab.this);
+        R.setUserAccount(matchingAccount);
+        matchingAccount.setPrefs(Preferences.userRoot().node(JCHAT_PREFS + File.separator + matchingAccount.getUsername()));
+        R.getAppPrefs().putBoolean(REMEMBER_CREDENTIALS, loginRememberMeCheckBox.isSelected());
+        R.getAppPrefs().putInt(LOGIN_ACCOUNT, matchingAccount.getId());
+        final UserIcon icon = DB.getUserIcon(matchingAccount.getId());
+
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                loginLAL.setVisible(false);
+                R.getMf().setUserStatus(UserAccount.Status.ONLINE);
+                if (icon != null) {
+                    R.getMf().setUserIconLabel(new ImageIcon(icon.getIconData()));
+                }
+                R.getMf().getSettingsPane().setPaneState(true);
+
+                welcomeTab = new WelcomeTab();
+                R.getMf().getT().addTab(
+                        "JChat - Welcome",
+                        JCHAT_LOGO, welcomeTab, WELCOME_TAB_TIP);
+                R.getMf().getT().setSelectedComponent(welcomeTab);
+                R.getMf().getT().remove(LoginTab.this);
+            }
+        });
     }
 
     private void failedLogin() {
-        // update UI
-        loginErrorLabel.setVisible(true);
-        loginButton.setEnabled(true);
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                // update UI
+                setPaneState(true);
+                loginErrorLabel.setVisible(true);
+            }
+        });
     }
+
+    private void setPaneState(final boolean tru) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                loginLAL.setVisible(!tru);
+                loginButton.setEnabled(tru);
+                loginRememberMeCheckBox.setEnabled(tru);
+                createAccountButton.setEnabled(tru);
+                if (!tru) {
+                    loginConnLabel.setText("");
+                }
+            }
+        });
+    }
+
+    @Override
+    public void update(Observable o, Object arg) {
+        if (!arg.equals(this.getClass().getSimpleName())) {
+            if (arg.equals(MessageType.NO_CONNECTION_BROADCAST)) {
+                setPaneState(true);
+            }
+            return;
+        }
+
+        q = (OQueue) o;
+        m = (Message) q.poll();
+
+        R.log("Login Tab receiving " + m.getType());
+
+        switch (m.getType()) {
+            case LOGIN_SUCCESS:
+                successfullLogin();
+                break;
+            case LOGIN_FAIL:
+                failedLogin();
+                break;
+        }
+    }
+
 }

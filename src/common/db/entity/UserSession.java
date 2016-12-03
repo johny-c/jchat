@@ -14,69 +14,87 @@ public class UserSession implements Serializable {
     private Boolean valid;
     private Integer lastSessionId;
 
+
     public UserSession() {
     }
+
 
     public UserSession(int id) {
         this();
         this.id = id;
     }
 
+
     public Integer getId() {
         return id;
     }
+
 
     public void setId(Integer id) {
         this.id = id;
     }
 
+
     public Integer getUserId() {
         return userId;
     }
+
 
     public void setUserId(Integer userId) {
         this.userId = userId;
     }
 
+
     public Long getToken() {
         return token;
     }
+
 
     public void setToken(Long token) {
         this.token = token;
     }
 
+
     public Date getStart() {
         return start;
     }
+
 
     public void setStart(Date start) {
         this.start = start;
     }
 
+
     public Date getEnd() {
         return end;
     }
+
 
     public void setEnd(Date end) {
         this.end = end;
     }
 
-    public Boolean getValid() {
+
+    public Boolean isValid() {
         return valid;
     }
+
 
     public void setValid(Boolean valid) {
         this.valid = valid;
     }
 
+
+
     public Integer getLastSessionId() {
         return lastSessionId;
     }
 
+
     public void setLastSessionId(Integer lastSessionId) {
         this.lastSessionId = lastSessionId;
     }
+
 
     @Override
     public int hashCode() {
@@ -84,6 +102,7 @@ public class UserSession implements Serializable {
         hash += (id != null ? id.hashCode() : 0);
         return hash;
     }
+
 
     @Override
     public boolean equals(Object object) {
@@ -98,8 +117,10 @@ public class UserSession implements Serializable {
         return true;
     }
 
+
     @Override
     public String toString() {
         return "client_db.entity.UserSession[ id=" + id + " ]";
     }
 }
+

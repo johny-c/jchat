@@ -19,7 +19,6 @@ public class AddContactRequest implements Serializable {
     private Date timeReplied;
     private Status status;
     private Boolean reply;
-    private Integer notificationId;
 
     public enum Status {
 
@@ -133,11 +132,4 @@ public class AddContactRequest implements Serializable {
         this.reply = reply;
     }
 
-    public Integer getNotificationId() {
-        return notificationId;
-    }
-
-    public void setNotificationId(Integer notificationId) {
-        this.notificationId = notificationId;
-    }
 }

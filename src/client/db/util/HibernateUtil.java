@@ -5,8 +5,9 @@
  */
 package client.db.util;
 
-import client.pojos.R;
-import common.pojos.Utils;
+import client.networking.R;
+import common.utils.Utils;
+import org.hibernate.HibernateException;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 
@@ -20,7 +21,6 @@ public class HibernateUtil {
 
     private static final SessionFactory sessionFactory;
     private static final String DRIVER_URL = "jdbc:h2:";
-    //private static final String DB_SETTINGS = "shutdown=true;hsqldb.write_delay=false;"; // HSQL DB
     private static final String CLIENT_DB_FOLDER_NAME = "db_folder";
     private static final String CLIENT_DB_FILE_NAME = "jchat_cdb";
     private static String connUrl;
@@ -35,29 +35,24 @@ public class HibernateUtil {
                     + "/" + CLIENT_DB_FOLDER_NAME
                     + "/" + CLIENT_DB_FILE_NAME + ";";  //+ DB_SETTINGS;
 
+            // First create the normal configuration from hibernate.cfg.xml
             Configuration cfg = new Configuration().configure();
 
+            // Then connect to the db using the customized connection url
             cfg = cfg.setProperty("hibernate.connection.url", connUrl);
             //.setProperty("hibernate.connection.datasource", "java:comp/env/jdbc/test")
             sessionFactory = cfg.buildSessionFactory();
 
             R.log("HibernateUtil configuration and session factory built");
 
-        } catch (Throwable ex) {
-            // Log the exception. 
-            System.err.println("Initial SessionFactory creation failed." + ex);
+        } catch (HibernateException ex) {
+            R.log("Initial SessionFactory creation failed." + ex);
             throw new ExceptionInInitializerError(ex);
         }
     }
 
     public static SessionFactory getSessionFactory() {
         return sessionFactory;
-    }
-
-    public static void main(String[] args) {
-
-        Database db = new Database();
-
     }
 
 }

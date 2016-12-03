@@ -5,23 +5,20 @@ import java.util.Date;
 
 public class FileTransfer implements Serializable {
 
+    private static final long serialVersionUID = 1L;
     private Integer id;
     private Integer sourceUserId;
     private Integer targetUserId;
-    private Integer fileSize;
-    private String fileName;
+    private Long fileSize;
+    private Integer filesCount;
     private String sourceName;
     private String targetName;
-    private String senderPath;
-    private String serverPath;
-    private String receiverPath;
     private Date timeSent;
     private Date timeByServer;
     private Date timeNotified;
     private Date timeDownloaded;
     private Status status;
     private Integer conversationId;
-    private Integer notificationId;
 
     public enum Status {
 
@@ -55,12 +52,12 @@ public class FileTransfer implements Serializable {
         this.targetUserId = targetUserId;
     }
 
-    public String getFileName() {
-        return fileName;
+    public Integer getFilesCount() {
+        return filesCount;
     }
 
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
+    public void setFilesCount(Integer filesCount) {
+        this.filesCount = filesCount;
     }
 
     public String getSourceName() {
@@ -77,30 +74,6 @@ public class FileTransfer implements Serializable {
 
     public void setTargetName(String targetName) {
         this.targetName = targetName;
-    }
-
-    public String getSenderPath() {
-        return senderPath;
-    }
-
-    public void setSenderPath(String senderPath) {
-        this.senderPath = senderPath;
-    }
-
-    public String getServerPath() {
-        return serverPath;
-    }
-
-    public void setServerPath(String serverPath) {
-        this.serverPath = serverPath;
-    }
-
-    public String getReceiverPath() {
-        return receiverPath;
-    }
-
-    public void setReceiverPath(String receiverPath) {
-        this.receiverPath = receiverPath;
     }
 
     public Date getTimeSent() {
@@ -151,19 +124,12 @@ public class FileTransfer implements Serializable {
         this.conversationId = conversationId;
     }
 
-    public Integer getNotificationId() {
-        return notificationId;
-    }
-
-    public void setNotificationId(Integer notificationId) {
-        this.notificationId = notificationId;
-    }
-
-    public Integer getFileSize() {
+    public Long getFileSize() {
         return fileSize;
     }
 
-    public void setFileSize(Integer fileSize) {
+    public void setFileSize(Long fileSize) {
         this.fileSize = fileSize;
     }
+
 }

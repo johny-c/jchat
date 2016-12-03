@@ -13,6 +13,7 @@ import java.io.Serializable;
  */
 public class TestEntity implements Serializable {
 
+    private static final long serialVersionUID = 1L;
     private Integer id;
     private String name;
     private Status status;
@@ -22,28 +23,35 @@ public class TestEntity implements Serializable {
         FIRST, SECOND, THIRD
     }
 
+
     public Integer getId() {
         return id;
     }
+
 
     public void setId(Integer id) {
         this.id = id;
     }
 
+
     public String getName() {
         return name;
     }
+
 
     public void setName(String name) {
         this.name = name;
     }
 
+
     public Status getStatus() {
         return status;
     }
+
 
     public void setStatus(Status status) {
         this.status = status;
     }
 
 }
+

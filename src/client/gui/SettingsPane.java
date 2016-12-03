@@ -4,14 +4,33 @@
  */
 package client.gui;
 
-import client.pojos.R;
-import common.pojos.Conventions;
-import common.pojos.Message;
-import common.pojos.OQueue;
-import common.pojos.Utils;
+import client.db.util.DB;
+import client.networking.NetworkManager;
+import client.networking.R;
+import client.tasks.ConnectionTask;
+import common.db.entity.UserIcon;
+import common.utils.Conventions;
+import static common.utils.Conventions.SERVER_IP;
+import static common.utils.Conventions.USER_ICON_PATH;
+import static common.utils.Conventions.USER_RICON_HEIGHT;
+import static common.utils.Conventions.USER_RICON_WIDTH;
+import common.utils.Message;
+import common.utils.MessageType;
+import common.utils.OQueue;
+import common.utils.Utils;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.prefs.Preferences;
+import javax.swing.ImageIcon;
+import javax.swing.JFileChooser;
 import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
+import javax.swing.filechooser.FileFilter;
 
 /**
  *
@@ -36,16 +55,22 @@ public class SettingsPane extends javax.swing.JPanel implements Conventions, Obs
     private void initComponents() {
 
         buttonGroup1 = new javax.swing.ButtonGroup();
+        saveFileChooser = new javax.swing.JFileChooser();
+        userImageChooser = new javax.swing.JFileChooser();
         jLabel1 = new javax.swing.JLabel();
         mainPane = new javax.swing.JPanel();
         downloadsPane = new javax.swing.JPanel();
-        jTextField1 = new javax.swing.JTextField();
-        jButton1 = new javax.swing.JButton();
-        jRadioButton1 = new javax.swing.JRadioButton();
-        jRadioButton2 = new javax.swing.JRadioButton();
+        downloadDirectoryField = new javax.swing.JTextField();
+        browseDownloadFolderButton = new javax.swing.JButton();
+        saveToDefaultButton = new javax.swing.JRadioButton();
+        saveToDefaultButton.setActionCommand(SAVE_TO_DEFAULT_RBUTTON);
+        saveToAskButton = new javax.swing.JRadioButton();
+        saveToAskButton.setActionCommand(SAVE_TO_ASK_RBUTTON);
+        credentialsPane = new javax.swing.JPanel();
+        rememberCredentialsCheckBox = new javax.swing.JCheckBox();
         networkPane = new javax.swing.JPanel();
         jLabel4 = new javax.swing.JLabel();
-        jFormattedTextField1 = new javax.swing.JFormattedTextField();
+        serverIpComboBox = new javax.swing.JComboBox();
         versionPane = new javax.swing.JPanel();
         jLabel2 = new javax.swing.JLabel();
         jchatVersionLabel = new javax.swing.JLabel();
@@ -54,14 +79,20 @@ public class SettingsPane extends javax.swing.JPanel implements Conventions, Obs
         checkVersionLAL.setVisible(false);
         checkVersionResponseLabel = new javax.swing.JLabel();
         checkVersionResponseLabel.setVisible(false);
-        downloadNewVersionButton = new javax.swing.JButton();
-        downloadNewVersionButton.setVisible(false);
-        closeButtonBehaviorPane = new javax.swing.JPanel();
+        updateAppButton = new javax.swing.JButton();
+        updateAppButton.setVisible(false);
+        versionConnLabel = new javax.swing.JLabel();
+        userIconPane = new javax.swing.JPanel();
+        userIconField = new javax.swing.JTextField();
+        browseUserIconButton = new javax.swing.JButton();
+        saveSettingsPane = new javax.swing.JPanel();
         saveSettingsButton = new javax.swing.JButton();
-        settingsSavedLabel = new javax.swing.JLabel();
-        settingsSavedLabel.setVisible(false);
+        saveSettingsLAL = new javax.swing.JLabel();
+        saveSettingsLAL.setVisible(false);
 
+        setBackground(new java.awt.Color(204, 255, 153));
         setName("SETTINGSPANE"); // NOI18N
+        setPreferredSize(new java.awt.Dimension(500, 800));
 
         jLabel1.setBackground(new java.awt.Color(60, 59, 55));
         jLabel1.setFont(new java.awt.Font("Serif", 1, 15)); // NOI18N
@@ -79,65 +110,105 @@ public class SettingsPane extends javax.swing.JPanel implements Conventions, Obs
 
         downloadsPane.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Download files", javax.swing.border.TitledBorder.LEFT, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Ubuntu", 2, 14), java.awt.Color.gray)); // NOI18N
 
-        jTextField1.setText("/home/Downloads/");
-        jTextField1.addActionListener(new java.awt.event.ActionListener() {
+        downloadDirectoryField.setEditable(false);
+        downloadDirectoryField.setText(DEFAULT_DOWNLOAD_FOLDER);
+        downloadDirectoryField.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jTextField1ActionPerformed(evt);
+                downloadDirectoryFieldActionPerformed(evt);
             }
         });
 
-        jButton1.setText("Browse...");
-
-        buttonGroup1.add(jRadioButton1);
-        jRadioButton1.setText("To:");
-        jRadioButton1.addActionListener(new java.awt.event.ActionListener() {
+        browseDownloadFolderButton.setText("Browse...");
+        browseDownloadFolderButton.setEnabled(false);
+        browseDownloadFolderButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jRadioButton1ActionPerformed(evt);
+                browseDownloadFolderButtonActionPerformed(evt);
             }
         });
 
-        buttonGroup1.add(jRadioButton2);
-        jRadioButton2.setText("Ask me every time");
+        buttonGroup1.add(saveToDefaultButton);
+        saveToDefaultButton.setSelected(true);
+        saveToDefaultButton.setText("To:");
+        saveToDefaultButton.setEnabled(false);
+        //saveToDefaultButton.addActionListener(this);
+        saveToDefaultButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                saveToDefaultButtonActionPerformed(evt);
+            }
+        });
+
+        buttonGroup1.add(saveToAskButton);
+        saveToAskButton.setText("Ask me every time");
+        saveToAskButton.setEnabled(false);
+        //saveToAskButton.addActionListener(this);
 
         javax.swing.GroupLayout downloadsPaneLayout = new javax.swing.GroupLayout(downloadsPane);
         downloadsPane.setLayout(downloadsPaneLayout);
         downloadsPaneLayout.setHorizontalGroup(
             downloadsPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, downloadsPaneLayout.createSequentialGroup()
-                .addContainerGap(23, Short.MAX_VALUE)
+                .addGap(50, 50, 50)
                 .addGroup(downloadsPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jRadioButton2)
                     .addGroup(downloadsPaneLayout.createSequentialGroup()
-                        .addComponent(jRadioButton1)
-                        .addGap(18, 18, 18)
-                        .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, 234, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addComponent(saveToAskButton)
+                        .addGap(138, 138, 138))
+                    .addGroup(downloadsPaneLayout.createSequentialGroup()
+                        .addComponent(saveToDefaultButton)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                        .addComponent(jButton1)))
-                .addGap(36, 36, 36))
+                        .addComponent(downloadDirectoryField, javax.swing.GroupLayout.DEFAULT_SIZE, 271, Short.MAX_VALUE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(browseDownloadFolderButton)
+                        .addContainerGap())))
         );
         downloadsPaneLayout.setVerticalGroup(
             downloadsPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(downloadsPaneLayout.createSequentialGroup()
                 .addGap(20, 20, 20)
                 .addGroup(downloadsPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                    .addComponent(jTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jRadioButton1)
-                    .addComponent(jButton1))
+                    .addComponent(downloadDirectoryField, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(saveToDefaultButton)
+                    .addComponent(browseDownloadFolderButton))
                 .addGap(18, 18, 18)
-                .addComponent(jRadioButton2)
+                .addComponent(saveToAskButton)
                 .addGap(20, 20, 20))
         );
 
         mainPane.add(downloadsPane);
 
+        credentialsPane.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Login", javax.swing.border.TitledBorder.LEFT, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Ubuntu", 2, 14), java.awt.Color.gray)); // NOI18N
+
+        rememberCredentialsCheckBox.setSelected(R.getAppPrefs().getBoolean(REMEMBER_CREDENTIALS, DEFAULT_REMEMBER_CREDENTIALS));
+        rememberCredentialsCheckBox.setText("Save my credentials the next time I log in");
+        rememberCredentialsCheckBox.setHorizontalTextPosition(javax.swing.SwingConstants.LEADING);
+
+        javax.swing.GroupLayout credentialsPaneLayout = new javax.swing.GroupLayout(credentialsPane);
+        credentialsPane.setLayout(credentialsPaneLayout);
+        credentialsPaneLayout.setHorizontalGroup(
+            credentialsPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(credentialsPaneLayout.createSequentialGroup()
+                .addGap(50, 50, 50)
+                .addComponent(rememberCredentialsCheckBox)
+                .addContainerGap(124, Short.MAX_VALUE))
+        );
+        credentialsPaneLayout.setVerticalGroup(
+            credentialsPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, credentialsPaneLayout.createSequentialGroup()
+                .addGap(20, 20, 20)
+                .addComponent(rememberCredentialsCheckBox)
+                .addGap(24, 24, 24))
+        );
+
+        mainPane.add(credentialsPane);
+
         networkPane.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "Network", javax.swing.border.TitledBorder.LEFT, javax.swing.border.TitledBorder.DEFAULT_POSITION, new java.awt.Font("Ubuntu", 2, 14), java.awt.Color.gray)); // NOI18N
 
         jLabel4.setText("Server IP Address:");
 
-        jFormattedTextField1.setText(Conventions.SERVER_IP);
-        jFormattedTextField1.addActionListener(new java.awt.event.ActionListener() {
+        serverIpComboBox.setEditable(true);
+        serverIpComboBox.setModel(new javax.swing.DefaultComboBoxModel(NetworkManager.getIpAddresses()));
+        serverIpComboBox.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                jFormattedTextField1ActionPerformed(evt);
+                serverIpComboBoxActionPerformed(evt);
             }
         });
 
@@ -146,19 +217,19 @@ public class SettingsPane extends javax.swing.JPanel implements Conventions, Obs
         networkPaneLayout.setHorizontalGroup(
             networkPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(networkPaneLayout.createSequentialGroup()
-                .addGap(54, 54, 54)
+                .addGap(50, 50, 50)
                 .addComponent(jLabel4)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(jFormattedTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(119, Short.MAX_VALUE))
+                .addComponent(serverIpComboBox, 0, 286, Short.MAX_VALUE)
+                .addContainerGap())
         );
         networkPaneLayout.setVerticalGroup(
             networkPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(networkPaneLayout.createSequentialGroup()
-                .addGap(30, 30, 30)
+                .addGap(27, 27, 27)
                 .addGroup(networkPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jLabel4)
-                    .addComponent(jFormattedTextField1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addComponent(serverIpComboBox, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addGap(20, 20, 20))
         );
 
@@ -168,25 +239,26 @@ public class SettingsPane extends javax.swing.JPanel implements Conventions, Obs
 
         jLabel2.setText("Current version: ");
 
-        jchatVersionLabel.setText(R.JCHAT_VERSION);
+        jchatVersionLabel.setText(JCHAT_VERSION);
 
         checkVersionButton.setText("Check for new version");
+        checkVersionButton.setEnabled(false);
         checkVersionButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 checkVersionButtonActionPerformed(evt);
             }
         });
 
-        checkVersionLAL.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/loading_circle_animation/21.gif"))); // NOI18N
+        checkVersionLAL.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/loading_circle_animation/21.gif"))); // NOI18N
 
         checkVersionResponseLabel.setForeground(new java.awt.Color(27, 210, 52));
         java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("client/gui/Bundle"); // NOI18N
         checkVersionResponseLabel.setText(bundle.getString("checkVersionResponseLabel")); // NOI18N
 
-        downloadNewVersionButton.setText(bundle.getString("downloadNewVersionButton")); // NOI18N
-        downloadNewVersionButton.addActionListener(new java.awt.event.ActionListener() {
+        updateAppButton.setText(bundle.getString("downloadNewVersionButton")); // NOI18N
+        updateAppButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                downloadNewVersionButtonActionPerformed(evt);
+                updateAppButtonActionPerformed(evt);
             }
         });
 
@@ -197,8 +269,8 @@ public class SettingsPane extends javax.swing.JPanel implements Conventions, Obs
             .addGroup(versionPaneLayout.createSequentialGroup()
                 .addGroup(versionPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(versionPaneLayout.createSequentialGroup()
-                        .addGap(54, 54, 54)
-                        .addGroup(versionPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addGap(50, 50, 50)
+                        .addGroup(versionPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addGroup(versionPaneLayout.createSequentialGroup()
                                 .addComponent(jLabel2)
                                 .addGap(18, 18, 18)
@@ -206,11 +278,13 @@ public class SettingsPane extends javax.swing.JPanel implements Conventions, Obs
                             .addGroup(versionPaneLayout.createSequentialGroup()
                                 .addComponent(checkVersionButton)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                .addComponent(checkVersionLAL))
-                            .addComponent(checkVersionResponseLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 318, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                                .addComponent(checkVersionLAL)
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                .addComponent(versionConnLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                            .addComponent(checkVersionResponseLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 375, javax.swing.GroupLayout.PREFERRED_SIZE)))
                     .addGroup(versionPaneLayout.createSequentialGroup()
                         .addGap(178, 178, 178)
-                        .addComponent(downloadNewVersionButton)))
+                        .addComponent(updateAppButton)))
                 .addContainerGap(65, Short.MAX_VALUE))
         );
         versionPaneLayout.setVerticalGroup(
@@ -221,58 +295,108 @@ public class SettingsPane extends javax.swing.JPanel implements Conventions, Obs
                     .addComponent(jLabel2)
                     .addComponent(jchatVersionLabel))
                 .addGap(18, 18, 18)
-                .addGroup(versionPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                .addGroup(versionPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                    .addComponent(versionConnLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                     .addComponent(checkVersionButton)
-                    .addComponent(checkVersionLAL))
+                    .addComponent(checkVersionLAL, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
                 .addGap(18, 18, 18)
                 .addComponent(checkVersionResponseLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 28, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(downloadNewVersionButton)
-                .addContainerGap(38, Short.MAX_VALUE))
+                .addComponent(updateAppButton)
+                .addGap(20, 20, 20))
         );
 
         checkVersionLAL.getAccessibleContext().setAccessibleName("checkVersionLAL");
 
         mainPane.add(versionPane);
 
-        saveSettingsButton.setText("Save Settings");
+        userIconPane.setBorder(javax.swing.BorderFactory.createTitledBorder(null, "My icon", javax.swing.border.TitledBorder.LEFT, javax.swing.border.TitledBorder.TOP, new java.awt.Font("Ubuntu", 2, 14), java.awt.Color.gray)); // NOI18N
+
+        userIconField.setEditable(false);
+        userIconField.setText(DEFAULT_USER_ICON_PATH);
+        userIconField.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                userIconFieldActionPerformed(evt);
+            }
+        });
+
+        browseUserIconButton.setText("Browse...");
+        browseUserIconButton.setEnabled(false);
+        browseUserIconButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                browseUserIconButtonActionPerformed(evt);
+            }
+        });
+
+        javax.swing.GroupLayout userIconPaneLayout = new javax.swing.GroupLayout(userIconPane);
+        userIconPane.setLayout(userIconPaneLayout);
+        userIconPaneLayout.setHorizontalGroup(
+            userIconPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, userIconPaneLayout.createSequentialGroup()
+                .addGap(50, 50, 50)
+                .addComponent(userIconField, javax.swing.GroupLayout.DEFAULT_SIZE, 320, Short.MAX_VALUE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(browseUserIconButton)
+                .addContainerGap())
+        );
+        userIconPaneLayout.setVerticalGroup(
+            userIconPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(userIconPaneLayout.createSequentialGroup()
+                .addGap(20, 20, 20)
+                .addGroup(userIconPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(userIconField, javax.swing.GroupLayout.PREFERRED_SIZE, 25, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(browseUserIconButton))
+                .addGap(20, 20, 20))
+        );
+
+        mainPane.add(userIconPane);
+
+        saveSettingsPane.setMinimumSize(new java.awt.Dimension(469, 57));
+
+        saveSettingsButton.setBackground(java.awt.Color.darkGray);
+        saveSettingsButton.setForeground(java.awt.Color.white);
+        saveSettingsButton.setText("Save");
+        saveSettingsButton.setBorderPainted(false);
+        saveSettingsButton.setFocusPainted(false);
         saveSettingsButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 saveSettingsButtonActionPerformed(evt);
             }
         });
 
-        settingsSavedLabel.setForeground(new java.awt.Color(27, 210, 52));
-        settingsSavedLabel.setText("Settings saved");
+        saveSettingsLAL.setIcon(checkVersionLAL.getIcon());
 
-        javax.swing.GroupLayout closeButtonBehaviorPaneLayout = new javax.swing.GroupLayout(closeButtonBehaviorPane);
-        closeButtonBehaviorPane.setLayout(closeButtonBehaviorPaneLayout);
-        closeButtonBehaviorPaneLayout.setHorizontalGroup(
-            closeButtonBehaviorPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(closeButtonBehaviorPaneLayout.createSequentialGroup()
-                .addGap(183, 183, 183)
-                .addGroup(closeButtonBehaviorPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(saveSettingsButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                    .addComponent(settingsSavedLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addContainerGap(165, Short.MAX_VALUE))
+        javax.swing.GroupLayout saveSettingsPaneLayout = new javax.swing.GroupLayout(saveSettingsPane);
+        saveSettingsPane.setLayout(saveSettingsPaneLayout);
+        saveSettingsPaneLayout.setHorizontalGroup(
+            saveSettingsPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(saveSettingsPaneLayout.createSequentialGroup()
+                .addContainerGap(217, Short.MAX_VALUE)
+                .addGroup(saveSettingsPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, saveSettingsPaneLayout.createSequentialGroup()
+                        .addComponent(saveSettingsButton)
+                        .addGap(215, 215, 215))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, saveSettingsPaneLayout.createSequentialGroup()
+                        .addComponent(saveSettingsLAL)
+                        .addGap(231, 231, 231))))
         );
-        closeButtonBehaviorPaneLayout.setVerticalGroup(
-            closeButtonBehaviorPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(closeButtonBehaviorPaneLayout.createSequentialGroup()
-                .addContainerGap()
+        saveSettingsPaneLayout.setVerticalGroup(
+            saveSettingsPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(saveSettingsPaneLayout.createSequentialGroup()
+                .addGap(20, 20, 20)
                 .addComponent(saveSettingsButton)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(settingsSavedLabel)
-                .addContainerGap(98, Short.MAX_VALUE))
+                .addComponent(saveSettingsLAL)
+                .addContainerGap(90, Short.MAX_VALUE))
         );
 
-        mainPane.add(closeButtonBehaviorPane);
+        mainPane.add(saveSettingsPane);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
         this.setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(mainPane, javax.swing.GroupLayout.DEFAULT_SIZE, 449, Short.MAX_VALUE)
+            .addComponent(mainPane, javax.swing.GroupLayout.DEFAULT_SIZE, 500, Short.MAX_VALUE)
             .addComponent(jLabel1, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
         );
         layout.setVerticalGroup(
@@ -280,74 +404,221 @@ public class SettingsPane extends javax.swing.JPanel implements Conventions, Obs
             .addGroup(layout.createSequentialGroup()
                 .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, 0)
-                .addComponent(mainPane, javax.swing.GroupLayout.PREFERRED_SIZE, 631, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addComponent(mainPane, javax.swing.GroupLayout.DEFAULT_SIZE, 775, Short.MAX_VALUE))
         );
     }// </editor-fold>//GEN-END:initComponents
 
-    private void jTextField1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jTextField1ActionPerformed
+    private void downloadDirectoryFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_downloadDirectoryFieldActionPerformed
         // TODO add your handling code here:
-    }//GEN-LAST:event_jTextField1ActionPerformed
+    }//GEN-LAST:event_downloadDirectoryFieldActionPerformed
 
-    private void jFormattedTextField1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jFormattedTextField1ActionPerformed
+    private void saveToDefaultButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveToDefaultButtonActionPerformed
         // TODO add your handling code here:
-    }//GEN-LAST:event_jFormattedTextField1ActionPerformed
-
-    private void jRadioButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jRadioButton1ActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_jRadioButton1ActionPerformed
+    }//GEN-LAST:event_saveToDefaultButtonActionPerformed
 
     private void checkVersionButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_checkVersionButtonActionPerformed
         checkVersionLAL.setVisible(true);
-        R.send(new Message(NEWEST_VERSION_REQUEST));
+        Message newVersionRequest = new Message(MessageType.NEWEST_VERSION_REQUEST);
+        NetworkManager.send(newVersionRequest);
+
     }//GEN-LAST:event_checkVersionButtonActionPerformed
 
-    private void downloadNewVersionButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_downloadNewVersionButtonActionPerformed
+    private void updateAppButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_updateAppButtonActionPerformed
 
-        SoftwareUpdateFrame swuf = new SoftwareUpdateFrame();
-        swuf.setVisible(true);
+        boolean proceed = GuiUtils.showDialogBeforeUpdate(SettingsPane.this);
+        if (!proceed) {
+            return;
+        }
 
-    }//GEN-LAST:event_downloadNewVersionButtonActionPerformed
+        R.getMf().getT().removeAll();
+
+        File currentJar = Utils.getCurrentJar();
+        String currentJarPath = currentJar.getAbsolutePath();
+        String appDir = currentJar.getParent();
+        String updaterJarPath = appDir + File.separator + "JChatUpdater.jar";
+
+        try {
+            String[] cmdarray = new String[4];
+            cmdarray[0] = "java";
+            cmdarray[1] = "-jar";
+            cmdarray[2] = updaterJarPath;
+            cmdarray[3] = currentJarPath;
+
+            Runtime.getRuntime().exec(cmdarray);
+
+        } catch (IOException ex) {
+            R.log(ex.toString());
+        }
+
+        System.exit(0);
+    }//GEN-LAST:event_updateAppButtonActionPerformed
+
+    private void browseDownloadFolderButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_browseDownloadFolderButtonActionPerformed
+        saveFileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        int returnVal = saveFileChooser.showOpenDialog(SettingsPane.this);
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            String s = saveFileChooser.getSelectedFile().getAbsolutePath();
+            downloadDirectoryField.setText(s);
+            saveToDefaultButton.setSelected(true);
+        }
+    }//GEN-LAST:event_browseDownloadFolderButtonActionPerformed
 
     private void saveSettingsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_saveSettingsButtonActionPerformed
-        //todo
-        saveSettings();
-        settingsSavedLabel.setVisible(true);
+
+        saveSettingsLAL.setVisible(true);
+        new SwingWorker() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                Thread.sleep(200);
+                return null;
+            }
+
+            @Override
+            protected void done() {
+
+                appPrefs = R.getAppPrefs();
+                // Server IP selection 
+                if (Utils.isValidIP(newIpAddress)) {
+                    appPrefs.put(SERVER_IP, newIpAddress);
+                } else {
+                    serverIpComboBox.setSelectedItem(appPrefs.get(SERVER_IP, DEFAULT_SERVER_IP));
+                }
+
+                // Remember credentials selection
+                R.getAppPrefs().putBoolean(REMEMBER_CREDENTIALS, rememberCredentialsCheckBox.isSelected());
+                Utils.printPrefs(appPrefs, "App");
+
+                userPrefs = R.getUserAccount().getPrefs();
+                if (userPrefs != null) {
+
+                    // Download Folder
+                    if (saveToAskButton.isSelected()) {
+                        userPrefs.putBoolean(ASK_DOWNLOAD_FOLDER, true);
+                    } else {
+                        userPrefs.putBoolean(ASK_DOWNLOAD_FOLDER, false);
+                    }
+
+                    // User Icon
+                    String oldIconPath = userPrefs.get(USER_ICON_PATH, DEFAULT_USER_ICON_PATH);
+                    String newIconPath = userIconField.getText();
+
+                    if (!newIconPath.equals(oldIconPath)) {
+                        // User is online and changed his icon
+
+                        // 1. Resize image
+                        byte[] imageData = Utils.getFileInBytes(newIconPath);
+                        ImageIcon rIcon = GuiUtils.getRescaledIcon(imageData, USER_RICON_WIDTH, USER_RICON_HEIGHT); // 1
+                        byte[] rImageData = Utils.getIconInBytes(rIcon);
+                        if (rImageData.length > MAX_USER_ICON_SIZE) {
+                            GuiUtils.showUserIconTooLargeDialog(SettingsPane.this, rImageData.length);
+                            userIconField.setText(oldIconPath);
+                            return;
+                        }
+
+                        userPrefs.put(USER_ICON_PATH, newIconPath);
+                        Utils.printPrefs(userPrefs, "User");
+
+                        // 2. Save image in DB (byte[] of resized)
+                        UserIcon icon = DB.getUserIcon(R.getUserAccount().getId());
+                        if (icon != null) {
+                            icon.setIconData(rImageData);
+                            DB.update(icon);
+                        } else {
+                            icon = new UserIcon();
+                            icon.setUacId(R.getUserAccount().getId());
+                            icon.setIconData(rImageData);
+                            DB.insert(icon);
+                        }
+
+                        // 3. Load image in MF (new ImageIcon(byte[]) of resized)
+                        R.getMf().setUserIconLabel(rIcon); // 3
+
+                        // 4. Send update to Server (byte[] of resized)
+                        Message m = new Message(MessageType.USER_ICON_UPDATE, icon);
+                        NetworkManager.send(m);
+                    }
+                }
+                saveSettingsLAL.setVisible(false);
+
+            }
+
+        }.execute();
+
     }//GEN-LAST:event_saveSettingsButtonActionPerformed
 
+    private void userIconFieldActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_userIconFieldActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_userIconFieldActionPerformed
+
+    private void browseUserIconButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_browseUserIconButtonActionPerformed
+
+        userImageChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+        FileFilter imageFilter = new GuiUtils.ImageFilter();
+        userImageChooser.removeChoosableFileFilter(userImageChooser.getAcceptAllFileFilter());
+        userImageChooser.setFileFilter(imageFilter);
+        int returnVal = userImageChooser.showOpenDialog(SettingsPane.this);
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            String s = userImageChooser.getSelectedFile().getAbsolutePath();
+            userIconField.setText(s);
+        }
+    }//GEN-LAST:event_browseUserIconButtonActionPerformed
+
+    private void serverIpComboBoxActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_serverIpComboBoxActionPerformed
+        newIpAddress = (String) serverIpComboBox.getSelectedItem();
+    }//GEN-LAST:event_serverIpComboBoxActionPerformed
+
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    private javax.swing.JButton browseDownloadFolderButton;
+    private javax.swing.JButton browseUserIconButton;
     private javax.swing.ButtonGroup buttonGroup1;
     private javax.swing.JButton checkVersionButton;
     private javax.swing.JLabel checkVersionLAL;
     private javax.swing.JLabel checkVersionResponseLabel;
-    private javax.swing.JPanel closeButtonBehaviorPane;
-    private javax.swing.JButton downloadNewVersionButton;
+    private javax.swing.JPanel credentialsPane;
+    private javax.swing.JTextField downloadDirectoryField;
     private javax.swing.JPanel downloadsPane;
-    private javax.swing.JButton jButton1;
-    private javax.swing.JFormattedTextField jFormattedTextField1;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel4;
-    private javax.swing.JRadioButton jRadioButton1;
-    private javax.swing.JRadioButton jRadioButton2;
-    private javax.swing.JTextField jTextField1;
     private javax.swing.JLabel jchatVersionLabel;
     private javax.swing.JPanel mainPane;
     private javax.swing.JPanel networkPane;
+    private javax.swing.JCheckBox rememberCredentialsCheckBox;
+    private javax.swing.JFileChooser saveFileChooser;
     private javax.swing.JButton saveSettingsButton;
-    private javax.swing.JLabel settingsSavedLabel;
+    private javax.swing.JLabel saveSettingsLAL;
+    private javax.swing.JPanel saveSettingsPane;
+    private javax.swing.JRadioButton saveToAskButton;
+    private javax.swing.JRadioButton saveToDefaultButton;
+    private javax.swing.JComboBox serverIpComboBox;
+    private javax.swing.JButton updateAppButton;
+    private javax.swing.JTextField userIconField;
+    private javax.swing.JPanel userIconPane;
+    private javax.swing.JFileChooser userImageChooser;
+    private javax.swing.JLabel versionConnLabel;
     private javax.swing.JPanel versionPane;
     // End of variables declaration//GEN-END:variables
+    public static final String SAVE_TO_ASK_RBUTTON = "saveAsk";
+    public static final String SAVE_TO_DEFAULT_RBUTTON = "saveDefault";
+    private String newIpAddress = "";
+    private Preferences appPrefs, userPrefs;
+    private ConnectionTask connectionTask;
+    private OQueue q;
+    private Message m;
 
     @Override
     public void update(Observable o, Object arg) {
         if (!arg.equals(this.getClass().getSimpleName())) {
+            if (arg.equals(MessageType.NO_CONNECTION_BROADCAST)) {
+                GuiUtils.stopAnimations(arg, checkVersionLAL);
+            }
             return;
         }
 
-        OQueue q = ((OQueue) o);
-        Message m = (Message) q.poll();
+        q = ((OQueue) o);
+        m = (Message) q.poll();
 
-        switch (m.getCode()) {
+        switch (m.getType()) {
             case NEWEST_VERSION_RESPONSE:
                 final String newestVersion = (String) m.getContent();
 
@@ -355,10 +626,10 @@ public class SettingsPane extends javax.swing.JPanel implements Conventions, Obs
                     @Override
                     public void run() {
                         checkVersionLAL.setVisible(false);
-                        if (Utils.isNewerVersion(newestVersion, R.JCHAT_VERSION)) {
+                        if (Utils.isNewerVersion(newestVersion, JCHAT_VERSION)) {
                             checkVersionResponseLabel.setText("There is a new JChat version for you!");
-                            downloadNewVersionButton.setText("Download JChat " + newestVersion);
-                            downloadNewVersionButton.setVisible(true);
+                            updateAppButton.setText("Download JChat " + newestVersion);
+                            updateAppButton.setVisible(true);
                         }
                         checkVersionResponseLabel.setVisible(true);
                     }
@@ -367,7 +638,24 @@ public class SettingsPane extends javax.swing.JPanel implements Conventions, Obs
         }
     }
 
-    private void saveSettings() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    void setPaneState(boolean b) {
+        saveToDefaultButton.setEnabled(b);
+        saveToAskButton.setEnabled(b);
+        browseDownloadFolderButton.setEnabled(b);
+        browseUserIconButton.setEnabled(b);
+        checkVersionButton.setEnabled(b);
+
+        if (b) {
+            userPrefs = R.getUserAccount().getPrefs();
+            boolean askDownloadFolder = userPrefs.getBoolean(ASK_DOWNLOAD_FOLDER, DEFAULT_ASK_DOWNLOAD_FOLDER);
+            if (askDownloadFolder) {
+                saveToAskButton.setSelected(true);
+            } else {
+                saveToDefaultButton.setSelected(true);
+            }
+            downloadDirectoryField.setText(userPrefs.get(DOWNLOAD_FOLDER, DEFAULT_DOWNLOAD_FOLDER));
+            userIconField.setText(userPrefs.get(USER_ICON_PATH, DEFAULT_USER_ICON_PATH));
+        }
     }
+
 }

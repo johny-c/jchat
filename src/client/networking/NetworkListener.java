@@ -1,54 +1,77 @@
 package client.networking;
 
-import common.pojos.Message;
-import common.pojos.OQueue;
-import common.pojos.Utils;
-import client.pojos.R;
+import common.utils.Message;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
-
+import java.util.concurrent.BlockingQueue;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.net.ssl.SSLSocket;
-import javax.swing.SwingWorker;
 
-public class NetworkListener extends SwingWorker<Void, Message> {
+public class NetworkListener implements Runnable { //     extends SwingWorker<Void, Void> {
 
-    private SSLSocket sslsocket;
+    private final SSLSocket sslsocket;
     private InputStream inputStream;
     private ObjectInputStream mis;
-    private OQueue messagesReceived;
-    private String caller = this.getClass().getSimpleName();
-    private final IncomingMessageHandler imh;
+    private final BlockingQueue<Message> messagesReceived;
+    private final String threadName = "NETWORK LISTENER THREAD";
+    private volatile boolean needed;
+    private volatile Thread thisThread;
 
-    NetworkListener(SSLSocket socket) {
+    NetworkListener(SSLSocket socket, BlockingQueue msgsFromNet) {
         sslsocket = socket;
-        imh = new IncomingMessageHandler();
-        messagesReceived = new OQueue(imh);
-        R.setIMH(imh);
-        try {
-            inputStream = sslsocket.getInputStream();
-        } catch (IOException e) {
-            Utils.print(caller, e.toString());
-            e.printStackTrace();
-        }
-
-        try {
-            mis = new ObjectInputStream(inputStream);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
+        messagesReceived = msgsFromNet;
     }
 
     @Override
-    protected Void doInBackground() throws Exception {
-        Message incomingMessage = null;
-        while ((incomingMessage = (Message) mis.readObject()) != null) {
-            Utils.print(caller, incomingMessage.toString());
-            messagesReceived.offer(incomingMessage);
+    public void run() {
+
+        try {
+            Thread.currentThread().setName(threadName);
+            thisThread = Thread.currentThread();
+
+            inputStream = sslsocket.getInputStream();
+            mis = new ObjectInputStream(inputStream);
+
+            Message incomingMessage;
+            needed = true;
+            while (needed) {
+
+                try {
+                    incomingMessage = (Message) mis.readObject();
+                } catch (ClassNotFoundException ex) {
+                    R.log(ex.toString());
+                    close();
+                    return;
+                }
+                R.log("receiving:  " + incomingMessage.getType().toString());
+                boolean o = messagesReceived.offer(incomingMessage);
+                R.log("Offered incoming msg to queue : " + o);
+            }
+
+            R.log("FINISHED");
+        } catch (IOException ex) {
+            R.log(ex.toString());
+            close();
         }
 
-        mis.close();
-        return null;
     }
+
+    public void stop() {
+        needed = false;
+        thisThread.interrupt();
+    }
+
+    private void close() {
+        if (mis != null) {
+            try {
+                mis.close();
+            } catch (IOException ex) {
+                R.log(ex.toString() + " WHILE CLOSING OBJECT INPUT STREAM");
+            }
+        }
+        NetworkManager.disconnect();
+    }
+
 }

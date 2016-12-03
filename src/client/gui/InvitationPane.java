@@ -4,11 +4,16 @@
  */
 package client.gui;
 
+import client.gui.utils.InvitationModel;
+import client.networking.NetworkManager;
+import java.util.Observable;
+import java.util.Observer;
+
 /**
  *
  * @author johny
  */
-public class InvitationPane extends javax.swing.JPanel {
+public class InvitationPane extends javax.swing.JPanel implements Observer {
 
     private final InvitationModel model;
 
@@ -18,6 +23,7 @@ public class InvitationPane extends javax.swing.JPanel {
     public InvitationPane() {
         model = new InvitationModel();
         initComponents();
+        NetworkManager.subscribe(InvitationPane.this);
     }
 
     /**
@@ -77,4 +83,8 @@ public class InvitationPane extends javax.swing.JPanel {
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JTable jTable1;
     // End of variables declaration//GEN-END:variables
+
+    @Override
+    public void update(Observable o, Object arg) {
+    }
 }

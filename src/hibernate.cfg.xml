@@ -1,26 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE hibernate-configuration PUBLIC "-//Hibernate/Hibernate Configuration DTD 3.0//EN" "http://hibernate.sourceforge.net/hibernate-configuration-3.0.dtd">
+<!DOCTYPE hibernate-configuration PUBLIC "-//Hibernate/Hibernate Configuration DTD 3.0//EN" "http://www.hibernate.org/dtd/hibernate-configuration-3.0.dtd">
 <hibernate-configuration>
-    <session-factory>
-        <property name="hibernate.connection.driver_class">org.h2.Driver</property>
-        <property name="hibernate.connection.url">jdbc:h2:db3/test</property>
-        <!-- <property name="hibernate.connection.url">jdbc:h2:tcp://localhost/C:\Database\Data\production;</property> -->
-        <property name="hibernate.connection.username">h2_user</property>
-        <property name="hibernate.dialect">org.hibernate.dialect.H2Dialect</property>
-        <property name="hibernate.show_sql">true</property>
-        <property name="hibernate.hbm2ddl.auto">update</property>
-        <property name="hibernate.cache.use_second_level_cache">false</property>
-        <property name="hibernate.connection.release_mode">auto</property>
-        <property name="hibernate.format_sql">true</property>
-        <mapping resource="common/db/entity/Participant.hbm.xml"/>
-        <mapping resource="common/db/entity/Contact.hbm.xml"/>
-        <mapping resource="common/db/entity/Conversation.hbm.xml"/>
-        <mapping resource="common/db/entity/ChatMessage.hbm.xml"/>
-        <mapping resource="common/db/entity/AddContactRequest.hbm.xml"/>
-        <mapping resource="common/db/entity/FileTransfer.hbm.xml"/>
-        <mapping resource="common/db/entity/Notification.hbm.xml"/>
-        <mapping resource="common/db/entity/UserContact.hbm.xml"/>
-        <mapping resource="common/db/entity/UserSession.hbm.xml"/>
-        <mapping resource="common/db/entity/TestEntity.hbm.xml"/>
-    </session-factory>
+  <session-factory>
+    <property name="hibernate.connection.driver_class">org.h2.Driver</property>
+    <property name="hibernate.connection.url">jdbc:h2:db3/test</property>
+    <!-- <property name="hibernate.connection.url">jdbc:h2:tcp://localhost/C:\Database\Data\production;</property> -->
+    <property name="hibernate.connection.username">h2_user</property>
+    <property name="hibernate.dialect">org.hibernate.dialect.H2Dialect</property>
+    <property name="hibernate.show_sql">true</property>
+    <property name="hibernate.hbm2ddl.auto">update</property>
+    <property name="hibernate.cache.use_second_level_cache">false</property>
+    <property name="hibernate.connection.release_mode">auto</property>
+    <property name="hibernate.format_sql">true</property>
+    <mapping resource="client/db/mapping/UserAccount.hbm.xml"/>
+    <mapping resource="client/db/mapping/UserContact.hbm.xml"/>
+    <mapping resource="client/db/mapping/MyAccountRef.hbm.xml"/>
+    <mapping resource="client/db/mapping/Conversation.hbm.xml"/>
+    <mapping resource="client/db/mapping/ConversationParticipant.hbm.xml"/>
+    <mapping resource="client/db/mapping/ChatMessage.hbm.xml"/>
+    <mapping resource="client/db/mapping/AddContactRequest.hbm.xml"/>
+    <mapping resource="client/db/mapping/FileTransfer.hbm.xml"/>
+    <mapping resource="client/db/mapping/Notification.hbm.xml"/>
+    <mapping resource="client/db/mapping/UserSession.hbm.xml"/>
+    <mapping resource="client/db/mapping/TestEntity.hbm.xml"/>
+    <mapping resource="client/db/mapping/UserIcon.hbm.xml"/>
+  </session-factory>
 </hibernate-configuration>

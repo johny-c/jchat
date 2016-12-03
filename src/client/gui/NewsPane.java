@@ -4,13 +4,15 @@
  */
 package client.gui;
 
+import client.db.util.DB;
+import client.networking.R;
 import common.db.entity.Notification;
-import client.db.util.Database;
-import common.pojos.Conventions;
-import common.pojos.Message;
-import common.pojos.OQueue;
+import common.db.entity.UserAccount;
+import common.utils.Conventions;
+import common.utils.Message;
+import common.utils.OQueue;
+import common.utils.Utils;
 import java.awt.Component;
-import java.util.Date;
 import java.util.Observable;
 import java.util.Observer;
 import javax.swing.JList;
@@ -22,45 +24,13 @@ import javax.swing.ListCellRenderer;
  */
 public class NewsPane extends javax.swing.JPanel implements Observer, Conventions {
 
-    private MainFrame mainFrameRef = null;
     private int counter = 0;
 
     /**
      * Creates new form NewsPane
      */
     public NewsPane() {
-        //model = new DefaultListModel<>();
         initComponents();
-    }
-
-    NewsPane(MainFrame mainFrame) {
-        this();
-        mainFrameRef = mainFrame;
-        Notification n = new Notification();
-        n.setType(Notification.Type.ACRR);
-        n.setTimeStamp(new Date());
-        addCell(new NotificationCell(n));
-        //np.model.addElement(n);
-        n = new Notification();
-        n.setTimeStamp(new Date());
-        n.setType(Notification.Type.ACRA);
-        //np.model.addElement(n);
-        addCell(new NotificationCell(n));
-        n = new Notification();
-        n.setTimeStamp(new Date());
-        n.setType(Notification.Type.ACRDR);
-        //np.model.addElement(n);
-        addCell(new NotificationCell(n));
-        n = new Notification();
-        n.setTimeStamp(new Date());
-        n.setType(Notification.Type.MISSED_CHAT);
-        //np.model.addElement(n);
-        addCell(new NotificationCell(n));
-        n = new Notification();
-        n.setTimeStamp(new Date());
-        n.setType(Notification.Type.FILE_SENT);
-        //np.model.addElement(n);
-        addCell(new NotificationCell(n));
     }
 
     /**
@@ -114,7 +84,7 @@ public class NewsPane extends javax.swing.JPanel implements Observer, Convention
     private static javax.swing.JPanel notificationsListPane;
     // End of variables declaration//GEN-END:variables
     //private DefaultListModel<Notification> model;
-    private Database db;
+    private DB db;
     private OQueue q;
     private Message m;
 
@@ -124,12 +94,26 @@ public class NewsPane extends javax.swing.JPanel implements Observer, Convention
             return;
         }
 
+        q = (OQueue) o;
         m = (Message) q.poll();
 
-        if (m.getCode() == FILE_DELIVERY) {
-            Notification n = (Notification) m.getContent();
-            addCell(new NotificationCell(n));
+        R.log("NewsPane seeing message " + m.getType());
+
+        if (m.getContent() instanceof UserAccount) {
+            Utils.printInfo((UserAccount) m.getContent());
         }
+
+        Notification n = (Notification) m.getContent();
+
+        R.log("NewsPane creating cell ");
+
+        NotificationCell cell = new NotificationCell(n, this);
+
+        R.log("NewsPane adding cell ");
+
+        addCell(cell);
+
+        R.log("NewsPane added cell ");
     }
 
     class NotificationCellRenderer implements ListCellRenderer, Conventions {
@@ -141,20 +125,17 @@ public class NewsPane extends javax.swing.JPanel implements Observer, Convention
         public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
             //Status = BY_SERVER, DELIVERED, READ, HANDLED
             //If status != READ || HANDLED
-            NotificationCell component = new NotificationCell((Notification) value);
+            NotificationCell component = new NotificationCell((Notification) value, NewsPane.this);
             //component.setBackground(cellHasFocus ? COLOR_LIGHT_BLACK : Color.WHITE);
             //component.setForeground(cellHasFocus ? Color.white : COLOR_LIGHT_BLACK);
             return component;
         }
     }
 
-    public static void main(String[] args) {
-    }
-
-    public void addCell(NotificationCell nc) {
+    private void addCell(NotificationCell nc) {
         notificationsListPane.add(nc);
         counter++;
-        mainFrameRef.updateNotificationsCounter(counter);
+        R.getMf().updateNotificationsCounter(counter);
         revalidate();
         repaint();
     }
@@ -162,7 +143,7 @@ public class NewsPane extends javax.swing.JPanel implements Observer, Convention
     public void removeCell(NotificationCell nc) {
         notificationsListPane.remove(nc);
         counter--;
-        mainFrameRef.updateNotificationsCounter(counter);
+        R.getMf().updateNotificationsCounter(counter);
         revalidate();
         repaint();
     }

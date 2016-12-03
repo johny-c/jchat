@@ -1,6 +1,6 @@
 package common.db.entity;
 
-import common.pojos.Conventions;
+import common.utils.Conventions;
 import java.io.Serializable;
 import java.util.Date;
 
@@ -11,12 +11,14 @@ public class ChatMessage implements Serializable, Conventions {
     private Integer serverGenId;
     private String body;
     private Integer sourceUserId;
-    private Integer targetUserId;
     private String sourceName;
-    private String targetName;
     private Date timeSent;
     private Date timeByServer;
     private Date timeDelivered;
+    private Date timeReported;
+    private Integer color;
+    private Integer targetsCount;
+    private Integer deliveredCount;
     private Status status;
     private Integer conversationId;
 
@@ -60,28 +62,12 @@ public class ChatMessage implements Serializable, Conventions {
         this.sourceUserId = sourceUserId;
     }
 
-    public Integer getTargetUserId() {
-        return targetUserId;
-    }
-
-    public void setTargetUserId(Integer targetUserId) {
-        this.targetUserId = targetUserId;
-    }
-
     public String getSourceName() {
         return sourceName;
     }
 
     public void setSourceName(String sourceName) {
         this.sourceName = sourceName;
-    }
-
-    public String getTargetName() {
-        return targetName;
-    }
-
-    public void setTargetName(String targetName) {
-        this.targetName = targetName;
     }
 
     public Date getTimeSent() {
@@ -108,6 +94,22 @@ public class ChatMessage implements Serializable, Conventions {
         this.timeDelivered = timeDelivered;
     }
 
+    public Date getTimeReported() {
+        return timeReported;
+    }
+
+    public void setTimeReported(Date timeReported) {
+        this.timeReported = timeReported;
+    }
+
+    public Integer getColor() {
+        return color;
+    }
+
+    public void setColor(Integer color) {
+        this.color = color;
+    }
+
     public Status getStatus() {
         return status;
     }
@@ -123,4 +125,21 @@ public class ChatMessage implements Serializable, Conventions {
     public void setConversationId(Integer conversationId) {
         this.conversationId = conversationId;
     }
+
+    public Integer getTargetsCount() {
+        return targetsCount;
+    }
+
+    public void setTargetsCount(Integer targetsCount) {
+        this.targetsCount = targetsCount;
+    }
+
+    public Integer getDeliveredCount() {
+        return deliveredCount;
+    }
+
+    public void setDeliveredCount(Integer deliveredCount) {
+        this.deliveredCount = deliveredCount;
+    }
+
 }

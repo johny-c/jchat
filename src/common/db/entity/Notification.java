@@ -1,6 +1,8 @@
 package common.db.entity;
 
+import java.io.Serializable;
 import java.util.Date;
+import java.util.List;
 
 /**
  * Exists only in Client, it is a virtual wrapper entity
@@ -9,8 +11,9 @@ import java.util.Date;
  *
  * @author johny
  */
-public class Notification {
+public final class Notification implements Serializable {
 
+    private static final long serialVersionUID = 1L;
     private Integer id;
     private Type type;
     private Status status;
@@ -20,7 +23,12 @@ public class Notification {
 
     public enum Type {
 
-        ACRR, ACRA, ACRDR, MISSED_CHAT, MISSED_CALL, FILE_SENT
+        ACR_RECEIVED,
+        ACR_DECISION_REPORT,
+        MISSED_CHAT,
+        MISSED_CALL,
+        FILE_RECEIVED,
+        FILE_DOWNLOAD_REPORT
     }
 
     // READ IF CLOSE BUTTON CLICKED
@@ -32,11 +40,6 @@ public class Notification {
     public Notification() {
     }
 
-    public Notification(Type type) {
-        this();
-        this.setType(type);
-    }
-
     public Notification(Type type, AddContactRequest acrIn) {
 
         this.setType(type);
@@ -44,9 +47,9 @@ public class Notification {
         this.setStatus(Notification.Status.UNREAD);
         this.setTimeStamp(acrIn.getTimeByServer());
 
-        if (type == Type.ACRR) {
+        if (type == Type.ACR_RECEIVED) {
             this.setRelatedUsername(acrIn.getQuesterName());
-        } else if (type == Type.ACRA || type == Type.ACRDR) {
+        } else if (type == Type.ACR_DECISION_REPORT) {
             this.setRelatedUsername(acrIn.getRecipientName());
         }
     }
@@ -56,17 +59,24 @@ public class Notification {
         this.setType(type);
         this.setEventId(fileIn.getId());
         this.setStatus(Notification.Status.UNREAD);
-        this.setTimeStamp(fileIn.getTimeByServer());
-        this.setRelatedUsername(fileIn.getSourceName());
+
+        if (type == Type.FILE_RECEIVED) {
+            this.setRelatedUsername(fileIn.getSourceName());
+            this.setTimeStamp(fileIn.getTimeByServer());
+        } else if (type == Type.FILE_DOWNLOAD_REPORT) {
+            this.setRelatedUsername(fileIn.getTargetName());
+            this.setTimeStamp(fileIn.getTimeDownloaded());
+        }
+
     }
 
-    public Notification(Type type, ChatMessage cmIn) {
+    public Notification(Type type, List<ChatMessage> cmsIn) {
 
         this.setType(type);
-        this.setEventId(cmIn.getConversationId());
+        this.setEventId(cmsIn.get(0).getConversationId());
         this.setStatus(Notification.Status.UNREAD);
-        this.setTimeStamp(cmIn.getTimeByServer());
-        this.setRelatedUsername(cmIn.getSourceName());
+        this.setTimeStamp(cmsIn.get(0).getTimeByServer());
+        this.setRelatedUsername(cmsIn.get(0).getSourceName());
     }
 
     public Integer getId() {

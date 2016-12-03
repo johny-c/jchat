@@ -4,104 +4,144 @@
  */
 package client.gui;
 
-import client.pojos.R;
-import client.pojos.FileDownloader;
+import client.db.util.DB;
+import client.networking.NetworkManager;
+import client.networking.R;
 import common.db.entity.AddContactRequest;
+import common.db.entity.ChatMessage;
+import common.db.entity.FileTransfer;
 import common.db.entity.Notification;
-import common.pojos.Conventions;
-import common.pojos.Message;
+import common.utils.Conventions;
+import common.utils.Message;
+import common.utils.MessageType;
+import common.utils.Utils;
 import java.awt.Color;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
+import java.util.Date;
+import java.util.List;
+import java.util.prefs.Preferences;
 import javax.swing.JButton;
-import javax.swing.JProgressBar;
-import javax.swing.SwingWorker;
+import javax.swing.JFileChooser;
 
 /**
  *
  * @author johny
  */
-public class NotificationCell extends javax.swing.JPanel implements Conventions, PropertyChangeListener {
+public class NotificationCell extends javax.swing.JPanel implements Conventions {
+
+    private NewsPane newsPane;
 
     /**
      * Creates new form NotificationCell
+     *
+     * @param np
      */
-    public NotificationCell() {
+    public NotificationCell(NewsPane np) {
+        newsPane = np;
         initComponents();
 
     }
 
-    NotificationCell(final Notification notif) {
-        this();
+    NotificationCell(final Notification notif, NewsPane np) {
+        this(np);
 
         String title = "", body = "";
         switch (notif.getType()) {
-            case ACRR:
-                title = "New Add Contact Request";
-                body = notif.getRelatedUsername();
+            case ACR_RECEIVED:
+                title = "New Contact Request";
+                body = notif.getRelatedUsername() == null ? "An anonymous user" : notif.getRelatedUsername();
                 body += " wants to add you as a contact!";
 
                 acceptButton = new JButton("Accept");
                 acceptButton.setBackground(COLOR_PASTEL_GREEN);
                 acceptButton.setForeground(Color.WHITE);
+                acceptButton.setFocusPainted(false);
+                //acceptButton
                 acceptButton.addActionListener(new java.awt.event.ActionListener() {
+                    @Override
                     public void actionPerformed(java.awt.event.ActionEvent evt) {
+                        if (GuiUtils.showOnlineActionOnly(R.getMf())) {
+                            return;
+                        }
+                        buttonsPane.setEnabled(false);
                         notif.setStatus(Notification.Status.HANDLED);
-                        R.getDb().updateNotificationStatus(notif);
-                        AddContactRequest acr = R.getDb().findACRByNotificationId(notif.getId());
+                        DB.update(notif);
+
+                        AddContactRequest acr = (AddContactRequest) DB.get(notif.getEventId(), AddContactRequest.class);
                         acr.setStatus(AddContactRequest.Status.REPLIED);
                         acr.setReply(true);
-                        Message m = new Message(ACR_DECISION, acr);
-                        R.getNm().send(m);
+                        acr.setTimeReplied(new Date());
+                        DB.update(acr);
+
+                        Message m = new Message(MessageType.ACR_DECISION, acr);
+                        NetworkManager.send(m);
                         removeSelf();
                     }
+
                 });
                 buttonsPane.add(acceptButton);
 
                 declineButton = new JButton("Decline");
                 declineButton.setBackground(COLOR_CRIMSON_RED);
                 declineButton.setForeground(Color.WHITE);
+                declineButton.setFocusPainted(false);
                 declineButton.addActionListener(new java.awt.event.ActionListener() {
+                    @Override
                     public void actionPerformed(java.awt.event.ActionEvent evt) {
+                        if (GuiUtils.showOnlineActionOnly(R.getMf())) {
+                            return;
+                        }
+                        buttonsPane.setEnabled(false);
                         notif.setStatus(Notification.Status.HANDLED);
-                        R.getDb().updateNotificationStatus(notif);
-                        Message m = new Message(ACR_DECISION);
-                        AddContactRequest acr = R.getDb().findACRByNotificationId(notif.getId());
+                        DB.update(notif);
+
+                        AddContactRequest acr = (AddContactRequest) DB.get(notif.getEventId(), AddContactRequest.class);
                         acr.setStatus(AddContactRequest.Status.REPLIED);
                         acr.setReply(false);
-                        m.setContent(acr);
-                        R.getNm().send(m);
+                        acr.setTimeReplied(new Date());
+                        DB.update(acr);
+
+                        Message m = new Message(MessageType.ACR_DECISION, acr);
+                        NetworkManager.send(m);
                         removeSelf();
                     }
+
                 });
 
                 buttonsPane.add(declineButton);
 
-
                 reviewLaterButton = new JButton("Review later");
                 reviewLaterButton.setBackground(COLOR_PASTEL_BLUE);
                 reviewLaterButton.setForeground(Color.WHITE);
-
+                reviewLaterButton.setFocusPainted(false);
                 reviewLaterButton.addActionListener(new java.awt.event.ActionListener() {
+                    @Override
                     public void actionPerformed(java.awt.event.ActionEvent evt) {
+                        buttonsPane.setEnabled(false);
                         notif.setStatus(Notification.Status.READ);
-                        R.getDb().updateNotificationStatus(notif);
+                        DB.update(notif);
+
+                        AddContactRequest acr = (AddContactRequest) DB.get(notif.getEventId(), AddContactRequest.class);
+                        acr.setStatus(AddContactRequest.Status.DELIVERED);
+                        DB.update(acr);
+
+                        //R.getMf().putInHistory(notif);
+                        //removeSelf();
                     }
+
                 });
 
                 buttonsPane.add(reviewLaterButton);
+                break;
 
-                break;
-            case ACRA:
-                title = "Request accepted";
+            case ACR_DECISION_REPORT:
+                AddContactRequest acr = (AddContactRequest) DB.get(notif.getEventId(), AddContactRequest.class);
+                title = "Request replied";
                 body = notif.getRelatedUsername();
-                body += " accepted your add contact request! You are now connected.";
+                body += acr.getReply() ? " accepted " : " rejected ";
+                body += " your request";
+                body += acr.getReply() ? " ! You are now connected." : ".";
                 break;
-            case ACRDR:
-                title = "Delivery Report";
-                body = notif.getRelatedUsername();
-                body += " got your add contact request.";
-                break;
+
             case MISSED_CHAT:
                 title = "Missed chat";
                 body = " . . . with " + notif.getRelatedUsername();
@@ -109,88 +149,102 @@ public class NotificationCell extends javax.swing.JPanel implements Conventions,
                 viewMissedChatButton = new JButton("View missed messages");
                 viewMissedChatButton.setBackground(COLOR_PASTEL_BLUE);
                 viewMissedChatButton.setForeground(Color.WHITE);
+                viewMissedChatButton.setFocusPainted(false);
                 viewMissedChatButton.addActionListener(new java.awt.event.ActionListener() {
+                    @Override
                     public void actionPerformed(java.awt.event.ActionEvent evt) {
+                        buttonsPane.setEnabled(false);
                         notif.setStatus(Notification.Status.HANDLED);
-                        R.getDb().updateNotificationStatus(notif);
-                        Message m = new Message(MISSED_CHAT_REQUEST);
-                        Integer convId = R.getDb().findConversationIdByNotificationId(notif.getId());
-                        if (convId == null) {
-                            m.setContent(convId);
-                            R.getNm().send(m);
-                        }
+                        DB.update(notif);
+
+                        Integer convId = notif.getEventId();
+                        List<ChatMessage> cmList = DB.getUnreadChatMessages(convId);
+                        String s = Utils.formatCMList(cmList);
+                        GuiUtils.display(s, textPane);
                     }
                 });
 
                 buttonsPane.add(viewMissedChatButton);
-
                 break;
+
             case MISSED_CALL:
                 title = "Missed call";
                 body = " . . . from " + notif.getRelatedUsername();
                 break;
-            case FILE_SENT:
+
+            case FILE_RECEIVED:
                 title = "File transfer";
                 body = "You 've got a file from " + notif.getRelatedUsername();
-
-
-                downloadFileProgressBar = new JProgressBar();
-                add(downloadFileProgressBar);
 
                 downloadFileButton = new JButton("Download file");
                 downloadFileButton.setBackground(COLOR_LIGHT_BLACK);
                 downloadFileButton.setForeground(Color.WHITE);
+                downloadFileButton.setFocusPainted(false);
                 downloadFileButton.addActionListener(new java.awt.event.ActionListener() {
+                    @Override
                     public void actionPerformed(java.awt.event.ActionEvent evt) {
+                        if (GuiUtils.showOnlineActionOnly(R.getMf())) {
+                            return;
+                        }
+
+                        Preferences userPrefs = R.getUserAccount().getPrefs();
+                        FileTransfer ft = (FileTransfer) DB.get(notif.getEventId(), FileTransfer.class);
+                        String saveFolder;
+                        boolean askSafePlace = userPrefs.getBoolean(ASK_DOWNLOAD_FOLDER, DEFAULT_ASK_DOWNLOAD_FOLDER);
+                        if (askSafePlace) {
+                            int returnVal = saveFolderChooser.showOpenDialog(R.getMf());
+
+                            if (returnVal == JFileChooser.APPROVE_OPTION) {
+                                saveFolder = saveFolderChooser.getSelectedFile().getAbsolutePath();
+                            } else {
+                                return;
+                            }
+                        } else {
+                            saveFolder = userPrefs.get(DOWNLOAD_FOLDER, DEFAULT_DOWNLOAD_FOLDER);
+                        }
+
+                        downloadFileButton.setEnabled(false);
+                        FileDownloadFrame fdf = new FileDownloadFrame(ft, saveFolder);
+                        fdf.setVisible(true);
                         notif.setStatus(Notification.Status.HANDLED);
-                        downloadFile(notif.getEventId());
-                        //HibernateUtil.updateNotificationStatus(notif);
-                        //Message m = new Message(MISSED_FILE_REQUEST);
-                        //Integer fileId = HibernateUtil.findFileIdByNotificationId(notif.getId());
-                        //if (fileId == null) {
-                        //   m.setContent(fileId);
-                        //   R.getNm().send(m);
-                        //}
                     }
 
-                    private void downloadFile(Integer fileId) {
-                        downloadFileButton.setEnabled(false);
-                        //progressBar = new JProgressBar(0, 100);
-                        downloadFileProgressBar.setValue(0);
-                        downloadFileProgressBar.setStringPainted(true);
-                        FileDownloader task = new FileDownloader(fileId, NotificationCell.this);
-                        task.addPropertyChangeListener(NotificationCell.this);
-                        task.execute();
-                    }
                 });
 
                 buttonsPane.add(downloadFileButton);
                 break;
-        }
 
+            case FILE_DOWNLOAD_REPORT:
+                title = "File download report";
+                body = notif.getRelatedUsername();
+                body += " downloaded the files you sent.";
+                break;
+        }
 
         titleLabel.setText(title);
         textPane.setText(body);
         setToolTipText(notif.getTimeStamp().toString());
 
         closeButton.addActionListener(new java.awt.event.ActionListener() {
+            @Override
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 notif.setStatus(Notification.Status.READ);
-                //HibernateUtil.updateNotificationStatus(notif);
+                //R.getMf().putInHistory(notif);
                 removeSelf();
             }
+
         });
-
-
 
     }
 
     private void removeSelf() {
         // Ancestors: JPanel, ViewPort, ScrollPane, NewsPane
-        Object o = getParent().getParent().getParent().getParent();
+        //Object o = getParent().getParent().getParent().getParent();
+
         //System.out.println("p2: " + o.getClass().getSimpleName());
-        NewsPane np = (NewsPane) o;
-        np.removeCell(NotificationCell.this);
+        //NewsPane np = (NewsPane) o;
+        //np.removeCell(NotificationCell.this);
+        newsPane.removeCell(this);
     }
 
     /**
@@ -202,6 +256,7 @@ public class NotificationCell extends javax.swing.JPanel implements Conventions,
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
+        saveFolderChooser = new javax.swing.JFileChooser();
         titleLabel = new javax.swing.JLabel();
         jScrollPane1 = new javax.swing.JScrollPane();
         textPane = new javax.swing.JTextPane();
@@ -220,11 +275,13 @@ public class NotificationCell extends javax.swing.JPanel implements Conventions,
         jScrollPane1.setViewportView(textPane);
 
         closeButton.setBackground(new Color(0,0,0,0));
-        closeButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/notification/close_button/close24.png"))); // NOI18N
+        closeButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/notification/close_button/close24.png"))); // NOI18N
         closeButton.setBorderPainted(false);
+        closeButton.setContentAreaFilled(false);
         closeButton.setName("closeButton"); // NOI18N
-        closeButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/notification/close_button/close_red_in24.png"))); // NOI18N
-        closeButton.setRolloverIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/notification/close_button/close_red_in24.png"))); // NOI18N
+        closeButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/notification/close_button/close_red_in24.png"))); // NOI18N
+        closeButton.setRolloverIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/notification/close_button/close_red_in24.png"))); // NOI18N
+        closeButton.setRolloverSelectedIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/notification/close_button/close_red_in24.png"))); // NOI18N
 
         buttonsPane.setBackground(getBackground());
         buttonsPane.setOpaque(false);
@@ -272,6 +329,7 @@ public class NotificationCell extends javax.swing.JPanel implements Conventions,
     private javax.swing.JButton closeButton;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JSeparator jSeparator1;
+    private javax.swing.JFileChooser saveFolderChooser;
     private javax.swing.JTextPane textPane;
     private javax.swing.JLabel titleLabel;
     // End of variables declaration//GEN-END:variables
@@ -280,21 +338,5 @@ public class NotificationCell extends javax.swing.JPanel implements Conventions,
     private JButton viewMissedChatButton;
     private JButton downloadFileButton;
     private JButton reviewLaterButton;
-    private JProgressBar downloadFileProgressBar;
 
-    @Override
-    public void propertyChange(PropertyChangeEvent evt) {
-        if ("progress" == evt.getPropertyName()) {
-            int progress = (Integer) evt.getNewValue();
-            downloadFileProgressBar.setValue(progress);
-        }
-
-        if ("state" == evt.getPropertyName()) {
-            if (evt.getNewValue() == SwingWorker.StateValue.DONE) {
-                downloadFileProgressBar.setVisible(false);
-                //downloadFileButton.setEnabled(true);
-                //R.getNm().send(new Message(FILE_DOWNLOAD_COMPLETED, ftToDo));
-            }
-        }
-    }
 }

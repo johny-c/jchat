@@ -4,41 +4,61 @@
  */
 package client.gui;
 
-import client.pojos.R;
-import common.pojos.Conventions;
-import common.pojos.Message;
-import common.pojos.OQueue;
-import common.pojos.Utils;
-import common.db.entity.User;
-import java.awt.CardLayout;
+import client.gui.utils.ContactsModel;
+import client.networking.NetworkManager;
+import client.networking.R;
+import common.db.entity.Notification;
+import common.db.entity.UserAccount;
+import common.utils.Conventions;
+import common.utils.Message;
+import common.utils.MessageType;
+import common.utils.OQueue;
 import java.awt.Color;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.util.Observable;
 import java.util.Observer;
-import javax.swing.Icon;
-import javax.swing.JFrame;
+import javax.swing.ImageIcon;
 import javax.swing.JMenuItem;
-import javax.swing.JPanel;
-import javax.swing.JPopupMenu;
-import javax.swing.JTabbedPane;
-import javax.swing.SwingUtilities;
-import javax.swing.SwingWorker;
 
 /**
  *
  * @author johny
  */
-public class MainFrame extends javax.swing.JFrame implements Observer, Conventions, ActionListener {
+public class MainFrame extends javax.swing.JFrame implements Observer, Conventions {
 
     /**
      * Creates new form MainFrame
      */
     public MainFrame() {
+
         initComponents();
-        R.getImh().subscribe(this);
+
+        notificationsLAL.setVisible(true);
+        NEWSPANE = new NewsPane();
+        NetworkManager.subscribe(NEWSPANE);
+        notificationsLAL.setVisible(false);
+
+        historyLAL.setVisible(true);
+        HISTORYPANE = new OldsPane();
+        historyLAL.setVisible(false);
+
+        contactsLAL.setVisible(true);
+        CONTACTSMODEL = new ContactsModel();
+        NetworkManager.subscribe(CONTACTSMODEL);
+        CONTACTSPANE = new ContactsPane(CONTACTSMODEL);
+        NetworkManager.subscribe(CONTACTSPANE);
+        contactsLAL.setVisible(false);
+
+        settingsLAL.setVisible(true);
+        SETTINGSPANE = new SettingsPane();
+        NetworkManager.subscribe(SETTINGSPANE);
+        settingsLAL.setVisible(false);
+
+        addContactsLAL.setVisible(true);
+        ADDCONTACTSPANE = new AddContactPane();
+        NetworkManager.subscribe(ADDCONTACTSPANE);
+        addContactsLAL.setVisible(false);
     }
 
     /**
@@ -59,60 +79,77 @@ public class MainFrame extends javax.swing.JFrame implements Observer, Conventio
         notificationsButton = new javax.swing.JButton();
         settingsButton = new javax.swing.JButton();
         contactsButton = new javax.swing.JButton();
+        addContactButton = new javax.swing.JButton();
+        historyButton = new javax.swing.JButton();
+        logoutButton = new javax.swing.JButton();
         notificationsCounterBackground = new javax.swing.JLabel();
         notificationsCounterBackground.setVisible(false);
         notificationsCounterLabel = new javax.swing.JLabel();
         notificationsCounterLabel.setVisible(false);
-        loadingNotificationsAnimationLabel = new javax.swing.JLabel();
-        loadingNotificationsAnimationLabel.setVisible(false);
-        loadingContactsAnimationLabel = new javax.swing.JLabel();
-        loadingContactsAnimationLabel.setVisible(false);
-        addContactButton = new javax.swing.JButton();
-        logoutButton = new javax.swing.JButton();
-        popupCardPane = new javax.swing.JPanel();
-        popupCardPane.setVisible(false);
-        tabbedPane = new javax.swing.JTabbedPane();
+        notificationsLAL = new javax.swing.JLabel();
+        notificationsLAL.setVisible(false);
+        contactsLAL = new javax.swing.JLabel();
+        contactsLAL.setVisible(false);
+        addContactsLAL = new javax.swing.JLabel();
+        addContactsLAL.setVisible(false);
+        settingsLAL = new javax.swing.JLabel();
+        settingsLAL.setVisible(false);
+        historyLAL = new javax.swing.JLabel();
+        historyLAL.setVisible(false);
         trayPane = new javax.swing.JPanel();
-        userLabel = new javax.swing.JLabel();
+        userIconLabel = new javax.swing.JLabel();
         userStatusButton = new javax.swing.JButton();
+        jScrollPane1 = new javax.swing.JScrollPane();
+        trayArea = new javax.swing.JTextPane();
+        tabsScroller = new javax.swing.JScrollPane();
+        tabbedPane = new client.gui.ChatTabbedPane();
 
-        statusOnlineMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/status/online16.png"))); // NOI18N
+        statusOnlineMenuItem.setForeground(java.awt.Color.darkGray);
+        statusOnlineMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/status/online16.png"))); // NOI18N
         java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("client/gui/Bundle"); // NOI18N
         statusOnlineMenuItem.setText(bundle.getString("statusOnlineMenuItemText")); // NOI18N
-        statusOnlineMenuItem.setActionCommand(common.db.entity.User.Status.ONLINE.toString());
-        statusOnlineMenuItem.addActionListener(this);
+        statusOnlineMenuItem.setToolTipText("");
+        statusOnlineMenuItem.setMinimumSize(new java.awt.Dimension(16, 16));
+        statusOnlineMenuItem.setActionCommand(common.db.entity.UserAccount.Status.ONLINE.toString());
+        statusOnlineMenuItem.addActionListener(statusMenuChangeListener);
         userStatusPopupMenu.add(statusOnlineMenuItem);
 
-        statusAwayMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/status/away16.png"))); // NOI18N
+        statusAwayMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/status/away16.png"))); // NOI18N
         statusAwayMenuItem.setText(bundle.getString("statusAwayMenuItemText")); // NOI18N
-        statusAwayMenuItem.setActionCommand(common.db.entity.User.Status.AWAY.toString());
-        statusAwayMenuItem.addActionListener(this);
+        statusAwayMenuItem.setMinimumSize(new java.awt.Dimension(16, 16));
+        statusAwayMenuItem.setActionCommand(common.db.entity.UserAccount.Status.AWAY.toString());
+        statusAwayMenuItem.addActionListener(statusMenuChangeListener);
         userStatusPopupMenu.add(statusAwayMenuItem);
 
-        statusBusyMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/status/busy16.png"))); // NOI18N
+        statusBusyMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/status/busy16.png"))); // NOI18N
         statusBusyMenuItem.setText(bundle.getString("statusBusyMenuItemText")); // NOI18N
-        statusBusyMenuItem.setActionCommand(common.db.entity.User.Status.BUSY.toString());
-        statusBusyMenuItem.addActionListener(this);
+        statusBusyMenuItem.setMinimumSize(new java.awt.Dimension(16, 16));
+        statusBusyMenuItem.setActionCommand(common.db.entity.UserAccount.Status.BUSY.toString());
+        statusBusyMenuItem.addActionListener(statusMenuChangeListener);
         userStatusPopupMenu.add(statusBusyMenuItem);
 
-        statusAppearOfflineMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/status/offline16.png"))); // NOI18N
+        statusAppearOfflineMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/status/appear_offline16.png"))); // NOI18N
         statusAppearOfflineMenuItem.setText(bundle.getString("statusAppearOfflineMenuItemText")); // NOI18N
-        statusAppearOfflineMenuItem.setActionCommand(common.db.entity.User.Status.APPEAR_OFFLINE.toString());
-        statusAppearOfflineMenuItem.addActionListener(this);
+        statusAppearOfflineMenuItem.setMinimumSize(new java.awt.Dimension(16, 16));
+        statusAppearOfflineMenuItem.setActionCommand(common.db.entity.UserAccount.Status.APPEAR_OFFLINE.toString());
+        statusAppearOfflineMenuItem.addActionListener(statusMenuChangeListener);
         userStatusPopupMenu.add(statusAppearOfflineMenuItem);
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("JChat");
-        setBackground(new java.awt.Color(60, 59, 55));
+        setTitle("JChat  " + R.JCHAT_VERSION);
+        setBackground(new java.awt.Color(204, 204, 204));
+        setBounds(GuiUtils.getPrefferedRectangle());
+        setIconImage(GuiUtils.getAppIcon());
         setMinimumSize(new java.awt.Dimension(100, 100));
 
         menuPane.setBackground(COLOR_PAPAYA);
         menuPane.setForeground(java.awt.Color.orange);
         menuPane.setOpaque(true);
+        menuPane.setPreferredSize(new java.awt.Dimension(54, 734));
 
         notificationsButton.setBackground(new Color(0,0,0,0));
-        notificationsButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/news/news48.png"))); // NOI18N
-        notificationsButton.setToolTipText("News");
+        notificationsButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/news/news48.png"))); // NOI18N
+        notificationsButton.setToolTipText(bundle.getString("notificationsButtonTooltip")); // NOI18N
         notificationsButton.setBorder(new javax.swing.border.SoftBevelBorder(javax.swing.border.BevelBorder.RAISED, new java.awt.Color(61, 36, 201), new java.awt.Color(239, 8, 8), new java.awt.Color(242, 222, 11), new java.awt.Color(14, 212, 47)));
         notificationsButton.setBorderPainted(false);
         notificationsButton.setContentAreaFilled(false);
@@ -120,120 +157,157 @@ public class MainFrame extends javax.swing.JFrame implements Observer, Conventio
         notificationsButton.setMargin(new java.awt.Insets(1, 1, 1, 1));
         notificationsButton.setMaximumSize(new java.awt.Dimension(50, 50));
         notificationsButton.setMinimumSize(new java.awt.Dimension(48, 48));
-        notificationsButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/news/news32.png"))); // NOI18N
+        notificationsButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/news/news32.png"))); // NOI18N
         notificationsButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 notificationsButtonActionPerformed(evt);
             }
         });
-        notificationsButton.setBounds(3, 10, 48, 48);
-        menuPane.add(notificationsButton, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        menuPane.add(notificationsButton);
+        notificationsButton.setBounds(3, 10, 50, 48);
 
         settingsButton.setForeground(new java.awt.Color(230, 25, 25));
-        settingsButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/settings/settings48.png"))); // NOI18N
-        settingsButton.setToolTipText("Settings");
+        settingsButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/settings/settings48.png"))); // NOI18N
+        settingsButton.setToolTipText(bundle.getString("settingsButtonTooltip")); // NOI18N
         settingsButton.setBorder(javax.swing.BorderFactory.createEmptyBorder(1, 1, 1, 1));
         settingsButton.setBorderPainted(false);
         settingsButton.setContentAreaFilled(false);
         settingsButton.setFocusPainted(false);
-        settingsButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/settings/settings32.png"))); // NOI18N
+        settingsButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/settings/settings32.png"))); // NOI18N
         settingsButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 settingsButtonActionPerformed(evt);
             }
         });
-        settingsButton.setBounds(3, 184, 48, 48);
-        menuPane.add(settingsButton, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        menuPane.add(settingsButton);
+        settingsButton.setBounds(3, 187, 48, 48);
 
         contactsButton.setBackground(new Color(0,0,0,0));
-        contactsButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/contacts/contacts48.png"))); // NOI18N
-        contactsButton.setToolTipText("Contacts");
+        contactsButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/contacts/contacts48.png"))); // NOI18N
+        contactsButton.setToolTipText(bundle.getString("contactsButtonTooltip")); // NOI18N
         contactsButton.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 0, 0));
         contactsButton.setBorderPainted(false);
         contactsButton.setContentAreaFilled(false);
-        contactsButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/contacts/contacts32.png"))); // NOI18N
+        contactsButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/contacts/contacts32.png"))); // NOI18N
         contactsButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 contactsButtonActionPerformed(evt);
             }
         });
-        contactsButton.setBounds(3, 68, 48, 48);
-        menuPane.add(contactsButton, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        menuPane.add(contactsButton);
+        contactsButton.setBounds(3, 71, 48, 48);
 
-        notificationsCounterBackground.setBackground(new java.awt.Color(94, 203, 64));
-        notificationsCounterBackground.setForeground(java.awt.Color.white);
-        notificationsCounterBackground.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        notificationsCounterBackground.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/notification/counter/plain24.png"))); // NOI18N
-        notificationsCounterBackground.setBounds(27, 37, 24, 24);
-        menuPane.add(notificationsCounterBackground, javax.swing.JLayeredPane.PALETTE_LAYER);
-
-        notificationsCounterLabel.setFont(new java.awt.Font("Liberation Sans", 1, 12)); // NOI18N
-        notificationsCounterLabel.setForeground(java.awt.Color.white);
-        notificationsCounterLabel.setText("15");
-        notificationsCounterLabel.setBounds(34, 43, 14, 12);
-        menuPane.add(notificationsCounterLabel, javax.swing.JLayeredPane.MODAL_LAYER);
-
-        loadingNotificationsAnimationLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/loading_circle_animation/21.gif"))); // NOI18N
-        loadingNotificationsAnimationLabel.setBounds(12, 20, 32, 32);
-        menuPane.add(loadingNotificationsAnimationLabel, javax.swing.JLayeredPane.POPUP_LAYER);
-        loadingContactsAnimationLabel.setBounds(10, 78, 32, 32);
-        menuPane.add(loadingContactsAnimationLabel, javax.swing.JLayeredPane.DEFAULT_LAYER);
-
-        addContactButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/add_contact/add-contact48.png"))); // NOI18N
+        addContactButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/add_contact/add-contact48.png"))); // NOI18N
+        addContactButton.setToolTipText(bundle.getString("addContactButtonTooltip")); // NOI18N
         addContactButton.setBorderPainted(false);
         addContactButton.setContentAreaFilled(false);
         addContactButton.setFocusPainted(false);
-        addContactButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/add_contact/add-contact32.png"))); // NOI18N
+        addContactButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/add_contact/add-contact32.png"))); // NOI18N
         addContactButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 addContactButtonActionPerformed(evt);
             }
         });
-        addContactButton.setBounds(3, 126, 48, 48);
-        menuPane.add(addContactButton, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        menuPane.add(addContactButton);
+        addContactButton.setBounds(3, 129, 48, 48);
 
-        logoutButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/logout/logout-icon48.png"))); // NOI18N
+        historyButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/history/history48.png"))); // NOI18N
+        historyButton.setToolTipText("History");
+        historyButton.setBorder(javax.swing.BorderFactory.createEmptyBorder(1, 1, 1, 1));
+        historyButton.setBorderPainted(false);
+        historyButton.setContentAreaFilled(false);
+        historyButton.setFocusPainted(false);
+        historyButton.setPreferredSize(new java.awt.Dimension(48, 48));
+        historyButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/history/history32.png"))); // NOI18N
+        historyButton.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                historyButtonActionPerformed(evt);
+            }
+        });
+        menuPane.add(historyButton);
+        historyButton.setBounds(3, 245, 48, 48);
+
+        logoutButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/logout/logout-icon32.png"))); // NOI18N
+        logoutButton.setToolTipText(bundle.getString("logoutButtonTooltip")); // NOI18N
         logoutButton.setBorderPainted(false);
         logoutButton.setContentAreaFilled(false);
         logoutButton.setFocusPainted(false);
-        logoutButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/logout/logout-icon32.png"))); // NOI18N
+        logoutButton.setPreferredSize(new java.awt.Dimension(48, 48));
+        logoutButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/logout/logout-icon24.png"))); // NOI18N
         logoutButton.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 logoutButtonActionPerformed(evt);
             }
         });
-        logoutButton.setBounds(3, 242, 48, 48);
-        menuPane.add(logoutButton, javax.swing.JLayeredPane.DEFAULT_LAYER);
+        menuPane.add(logoutButton);
+        logoutButton.setBounds(0, 361, 48, 48);
 
-        popupCardPane.setBorder(null);
-        popupCardPane.setMaximumSize(new java.awt.Dimension(300, 5000));
-        popupCardPane.setMinimumSize(new java.awt.Dimension(250, 620));
-        popupCardPane.setPreferredSize(new java.awt.Dimension(300, 620));
-        popupCardPane.setLayout(new java.awt.CardLayout());
+        notificationsCounterBackground.setBackground(new java.awt.Color(94, 203, 64));
+        notificationsCounterBackground.setForeground(java.awt.Color.white);
+        notificationsCounterBackground.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        notificationsCounterBackground.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/notification/counter/plain24.png"))); // NOI18N
+        menuPane.add(notificationsCounterBackground);
+        notificationsCounterBackground.setBounds(27, 37, 24, 24);
+        menuPane.setLayer(notificationsCounterBackground, javax.swing.JLayeredPane.PALETTE_LAYER);
 
-        tabbedPane.setBackground(java.awt.Color.darkGray);
-        tabbedPane.setBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED, null, new java.awt.Color(164, 62, 62), null, null));
-        tabbedPane.setMinimumSize(new java.awt.Dimension(600, 620));
-        tabbedPane.setOpaque(true);
-        tabbedPane.setPreferredSize(new java.awt.Dimension(600, 620));
+        notificationsCounterLabel.setFont(new java.awt.Font("Nimbus Sans L", 1, 14)); // NOI18N
+        notificationsCounterLabel.setForeground(java.awt.Color.white);
+        notificationsCounterLabel.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+        notificationsCounterLabel.setText("15");
+        notificationsCounterLabel.setAlignmentX(0.5F);
+        notificationsCounterLabel.setHorizontalTextPosition(javax.swing.SwingConstants.CENTER);
+        menuPane.add(notificationsCounterLabel);
+        notificationsCounterLabel.setBounds(33, 41, 12, 16);
+        menuPane.setLayer(notificationsCounterLabel, javax.swing.JLayeredPane.MODAL_LAYER);
+
+        notificationsLAL.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/loading_circle_animation/21.gif"))); // NOI18N
+        menuPane.add(notificationsLAL);
+        notificationsLAL.setBounds(12, 20, 32, 32);
+        menuPane.setLayer(notificationsLAL, javax.swing.JLayeredPane.POPUP_LAYER);
+
+        contactsLAL.setIcon(notificationsLAL.getIcon());
+        menuPane.add(contactsLAL);
+        contactsLAL.setBounds(12, 79, 32, 32);
+        menuPane.setLayer(contactsLAL, javax.swing.JLayeredPane.POPUP_LAYER);
+
+        addContactsLAL.setIcon(notificationsLAL.getIcon());
+        menuPane.add(addContactsLAL);
+        addContactsLAL.setBounds(12, 137, 32, 32);
+        menuPane.setLayer(addContactsLAL, javax.swing.JLayeredPane.POPUP_LAYER);
+
+        settingsLAL.setIcon(notificationsLAL.getIcon());
+        menuPane.add(settingsLAL);
+        settingsLAL.setBounds(12, 195, 32, 32);
+        menuPane.setLayer(settingsLAL, javax.swing.JLayeredPane.POPUP_LAYER);
+
+        historyLAL.setIcon(notificationsLAL.getIcon());
+        menuPane.add(historyLAL);
+        historyLAL.setBounds(10, 250, 32, 32);
+        menuPane.setLayer(historyLAL, javax.swing.JLayeredPane.POPUP_LAYER);
 
         trayPane.setBackground(java.awt.Color.darkGray);
-        trayPane.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                trayPaneMouseClicked(evt);
-            }
-        });
+        trayPane.setMaximumSize(new java.awt.Dimension(32767, 80));
+        trayPane.setMinimumSize(new java.awt.Dimension(166, 73));
 
-        userLabel.setForeground(java.awt.Color.white);
-        userLabel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/minions/0005-Minion-Hello-icon.png"))); // NOI18N
-        userLabel.setText("Username");
+        userIconLabel.setForeground(java.awt.Color.white);
+        userIconLabel.setIcon(GuiUtils.getDefaultUserIcon());
 
-        userStatusButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/status/offline24.png"))); // NOI18N
+        userStatusButton.setForeground(new java.awt.Color(255, 255, 255));
+        userStatusButton.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/status/offline24.png"))); // NOI18N
         userStatusButton.setBorderPainted(false);
         userStatusButton.setContentAreaFilled(false);
         userStatusButton.setFocusPainted(false);
-        userStatusButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/icons/status/offline16.png"))); // NOI18N
-        userStatusButton.addMouseListener(new PopupListener(userStatusPopupMenu));
+        userStatusButton.setHorizontalAlignment(javax.swing.SwingConstants.TRAILING);
+        userStatusButton.setHorizontalTextPosition(javax.swing.SwingConstants.LEADING);
+        userStatusButton.setMargin(new java.awt.Insets(2, 2, 2, 2));
+        userStatusButton.setPressedIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/status/offline16.png"))); // NOI18N
+        userStatusButton.addMouseListener(new client.gui.utils.PopupMenuListener(userStatusPopupMenu));
+
+        trayArea.setEditable(false);
+        trayArea.setBackground(new java.awt.Color(243, 234, 190));
+        trayArea.setBorder(null);
+        trayArea.setForeground(java.awt.Color.blue);
+        jScrollPane1.setViewportView(trayArea);
 
         javax.swing.GroupLayout trayPaneLayout = new javax.swing.GroupLayout(trayPane);
         trayPane.setLayout(trayPaneLayout);
@@ -241,216 +315,163 @@ public class MainFrame extends javax.swing.JFrame implements Observer, Conventio
             trayPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(trayPaneLayout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(userLabel)
+                .addComponent(userIconLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 48, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(userStatusButton, javax.swing.GroupLayout.PREFERRED_SIZE, 48, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addComponent(userStatusButton, javax.swing.GroupLayout.PREFERRED_SIZE, 150, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jScrollPane1)
+                .addContainerGap())
         );
         trayPaneLayout.setVerticalGroup(
             trayPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(trayPaneLayout.createSequentialGroup()
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, trayPaneLayout.createSequentialGroup()
                 .addContainerGap()
-                .addGroup(trayPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(userLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 49, Short.MAX_VALUE)
+                .addGroup(trayPaneLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addComponent(jScrollPane1)
+                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, trayPaneLayout.createSequentialGroup()
+                        .addComponent(userIconLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 48, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(0, 0, Short.MAX_VALUE))
                     .addComponent(userStatusButton, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap())
         );
+
+        tabsScroller.setMinimumSize(new java.awt.Dimension(603, 623));
+        tabsScroller.setName(""); // NOI18N
+
+        tabbedPane.setBackground(java.awt.Color.white);
+        tabbedPane.setBorder(javax.swing.BorderFactory.createBevelBorder(javax.swing.border.BevelBorder.RAISED, null, new java.awt.Color(164, 62, 62), null, null));
+        tabbedPane.setMaximumSize(new java.awt.Dimension(600, 620));
+        tabbedPane.setMinimumSize(new java.awt.Dimension(600, 620));
+        tabbedPane.setPreferredSize(new java.awt.Dimension(600, 620));
+        tabsScroller.setViewportView(tabbedPane);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
-                .addComponent(menuPane, javax.swing.GroupLayout.PREFERRED_SIZE, 54, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(0, 0, 0)
-                .addComponent(popupCardPane, javax.swing.GroupLayout.PREFERRED_SIZE, 500, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(menuPane, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, 0)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(tabbedPane, javax.swing.GroupLayout.DEFAULT_SIZE, 712, Short.MAX_VALUE)
-                    .addComponent(trayPane, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                    .addComponent(trayPane, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                    .addComponent(tabsScroller, javax.swing.GroupLayout.DEFAULT_SIZE, 615, Short.MAX_VALUE)))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(menuPane)
-            .addComponent(popupCardPane, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, 734, Short.MAX_VALUE)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                 .addComponent(trayPane, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, 0)
-                .addComponent(tabbedPane, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addComponent(tabsScroller, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+            .addComponent(menuPane, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
         );
 
         menuPane.getAccessibleContext().setAccessibleParent(this);
-        popupCardPane.getAccessibleContext().setAccessibleParent(menuPane);
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
     private void contactsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_contactsButtonActionPerformed
-        // TODO add your handling code here:
-        if (contactsPane == null) {
-            loadingContactsAnimationLabel.setVisible(true);
-            new SwingWorker<Void, Void>() {
-                @Override
-                protected Void doInBackground() throws Exception {
-                    contactsPane = new ContactsPane();
-                    return null;
-                }
 
-                @Override
-                protected void done() {
-                    loadingContactsAnimationLabel.setVisible(false);
-                    popupCardPane.add(contactsPane, contactsPane.getName());
-                    showOrHide(contactsPane);
-                }
-            }.execute();
-
-            System.out.println("Creating newsPane with main frame ref");
-        } else {
-            showOrHide(contactsPane);
-        }
+        getT().addAppTab("Contacts", JCHAT_LOGO, CONTACTSPANE, "Contacts");
     }//GEN-LAST:event_contactsButtonActionPerformed
 
     private void notificationsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_notificationsButtonActionPerformed
-        // TODO add your handling code here:
-        if (newsPane == null) {
-            loadingNotificationsAnimationLabel.setVisible(true);
-            new SwingWorker<Void, Void>() {
-                @Override
-                protected Void doInBackground() throws Exception {
-                    newsPane = new NewsPane(MainFrame.this);
-                    return null;
-                }
 
-                @Override
-                protected void done() {
-                    loadingNotificationsAnimationLabel.setVisible(false);
-                    popupCardPane.add(newsPane, newsPane.getName());
-                    showOrHide(newsPane);
-                }
-            }.execute();
-
-            System.out.println("Creating newsPane with main frame ref");
-        } else {
-            showOrHide(newsPane);
-        }
-
+        getT().addAppTab("News", JCHAT_LOGO, NEWSPANE, "News");
     }//GEN-LAST:event_notificationsButtonActionPerformed
 
     private void settingsButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_settingsButtonActionPerformed
-        // TODO add your handling code here:
-        if (settingsPane == null) {
-            settingsPane = new SettingsPane();
-            popupCardPane.add(settingsPane, settingsPane.getName());
-        }
-        showOrHide(settingsPane);
 
+        getT().addAppTab("Settings", JCHAT_LOGO, SETTINGSPANE, "Settings");
     }//GEN-LAST:event_settingsButtonActionPerformed
 
     private void logoutButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_logoutButtonActionPerformed
-        Message m = new Message(LOGOUT_REQUEST);
-        R.getNm().send(m);
+        if (R.getUserAccount().getStatus() == UserAccount.Status.OFFLINE) {
+            R.terminate();
+        } else {
+            setUserStatus(UserAccount.Status.OFFLINE);
+            setUserIconLabel(GuiUtils.getDefaultUserIcon());
+            getT().removeAll();
+            LoginTab loginTab = new LoginTab();
+            getT().addTab(loginTab.getName(), JCHAT_LOGO, loginTab, LOGIN_TAB_TIP);
+            Message logout = new Message(MessageType.LOGOUT_REQUEST);
+            NetworkManager.send(logout);
+        }
     }//GEN-LAST:event_logoutButtonActionPerformed
 
     private void addContactButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addContactButtonActionPerformed
-        // TODO add your handling code here:
-        if (addContactPane == null) {
-            addContactPane = new AddContactPane();
-            popupCardPane.add(addContactPane, addContactPane.getName());
-        }
-        showOrHide(addContactPane);
+
+        getT().addAppTab("Add a contact", JCHAT_LOGO, ADDCONTACTSPANE, "Add a contact");
     }//GEN-LAST:event_addContactButtonActionPerformed
 
-    private void trayPaneMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_trayPaneMouseClicked
-    }//GEN-LAST:event_trayPaneMouseClicked
+    private void historyButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_historyButtonActionPerformed
 
-    private void showOrHide(JPanel pane) {
-        if (popupCardPane.isVisible() && currentlyShown.equals(pane.getName())) {
-            popupCardPane.setVisible(false);
-            return;
-        }
+        getT().addAppTab("History", JCHAT_LOGO, HISTORYPANE, "History");
+    }//GEN-LAST:event_historyButtonActionPerformed
 
-        CardLayout cl = (CardLayout) (popupCardPane.getLayout());
-        cl.show(popupCardPane, pane.getName());
-        currentlyShown = pane.getName();
-        if (!popupCardPane.isVisible()) {
-            popupCardPane.setVisible(true);
-        }
-    }
-
-    /**
-     * @param args the command line arguments
-     */
-    public static void main(String args[]) {
-        /* Set the Nimbus look and feel */
-        //<editor-fold defaultstate="collapsed" desc=" Look and feel setting code (optional) ">
-        /* If Nimbus (introduced in Java SE 6) is not available, stay with the default look and feel.
-         * For details see http://download.oracle.com/javase/tutorial/uiswing/lookandfeel/plaf.html 
-         */
-        try {
-            for (javax.swing.UIManager.LookAndFeelInfo info : javax.swing.UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    javax.swing.UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (ClassNotFoundException ex) {
-            java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (InstantiationException ex) {
-            java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (IllegalAccessException ex) {
-            java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        } catch (javax.swing.UnsupportedLookAndFeelException ex) {
-            java.util.logging.Logger.getLogger(MainFrame.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
-        }
-        //</editor-fold>
-        R r = new R();
-        /* Create and display the form */
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                MainFrame mf = new MainFrame();
-                mf.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-                mf.setVisible(true);
-            }
-        });
-    }
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JButton addContactButton;
+    private javax.swing.JLabel addContactsLAL;
     private javax.swing.JButton contactsButton;
-    private javax.swing.JLabel loadingContactsAnimationLabel;
-    private javax.swing.JLabel loadingNotificationsAnimationLabel;
+    private javax.swing.JLabel contactsLAL;
+    private javax.swing.JButton historyButton;
+    private javax.swing.JLabel historyLAL;
+    private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JButton logoutButton;
     private javax.swing.JLayeredPane menuPane;
     private javax.swing.JButton notificationsButton;
     private javax.swing.JLabel notificationsCounterBackground;
     private javax.swing.JLabel notificationsCounterLabel;
-    private javax.swing.JPanel popupCardPane;
+    private javax.swing.JLabel notificationsLAL;
     private javax.swing.JButton settingsButton;
+    private javax.swing.JLabel settingsLAL;
     private javax.swing.JMenuItem statusAppearOfflineMenuItem;
     private javax.swing.JMenuItem statusAwayMenuItem;
     private javax.swing.JMenuItem statusBusyMenuItem;
     private javax.swing.JMenuItem statusOnlineMenuItem;
     private javax.swing.JTabbedPane tabbedPane;
+    private javax.swing.JScrollPane tabsScroller;
+    private javax.swing.JTextPane trayArea;
     private javax.swing.JPanel trayPane;
-    private javax.swing.JLabel userLabel;
+    private javax.swing.JLabel userIconLabel;
     private javax.swing.JButton userStatusButton;
     private javax.swing.JPopupMenu userStatusPopupMenu;
     // End of variables declaration//GEN-END:variables
-    private NewsPane newsPane;
-    private ContactsPane contactsPane;
-    private SettingsPane settingsPane;
-    private AddContactPane addContactPane;
-    private InvitationPane invitationPane;
-    private String currentlyShown = "";
+    private static NewsPane NEWSPANE;
+    private static OldsPane HISTORYPANE;
+    private static ContactsModel CONTACTSMODEL;
+    private static ContactsPane CONTACTSPANE;
+    private static SettingsPane SETTINGSPANE;
+    private static AddContactPane ADDCONTACTSPANE;
     private OQueue q;
     private Message m;
 
-    void putTab(JPanel tab) {
-        tabbedPane.addTab(tab.getName(), JCHAT_LOGO, tab, tab.getToolTipText());
+    private final ActionListener statusMenuChangeListener = new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            JMenuItem source = (JMenuItem) (e.getSource());
+            String newStatus = source.getActionCommand();
+            UserAccount USER = R.getUserAccount();
+            if (USER.getStatus() != UserAccount.Status.OFFLINE) {
+                USER.setStatus(UserAccount.Status.valueOf(newStatus));
+                GuiUtils.setStatus(USER.getStatus(), userStatusButton, userIconLabel);
+
+                Message m = new Message(MessageType.USER_UPDATE, USER);
+                NetworkManager.send(m);
+            }
+        }
+    };
+
+    public ChatTabbedPane getT() {
+        return (ChatTabbedPane) tabbedPane;
     }
 
-    JTabbedPane getT() {
-        return tabbedPane;
+    NewsPane getNewsPane() {
+        return NEWSPANE;
+    }
+
+    public SettingsPane getSettingsPane() {
+        return SETTINGSPANE;
     }
 
     void updateNotificationsCounter(int counter) {
@@ -458,7 +479,6 @@ public class MainFrame extends javax.swing.JFrame implements Observer, Conventio
         if (counter == 0) {
             notificationsCounterBackground.setVisible(false);
             notificationsCounterLabel.setVisible(false);
-            popupCardPane.setVisible(false);
         } else {
             if (!notificationsCounterBackground.isVisible()) {
                 notificationsCounterBackground.setVisible(true);
@@ -469,77 +489,47 @@ public class MainFrame extends javax.swing.JFrame implements Observer, Conventio
         }
     }
 
-    @Override
-    public void update(Observable o, Object arg) {
-        if (!arg.equals(this.getClass().getSimpleName())) {
-            return;
-        }
-
-        OQueue q = (OQueue) o;
-        final Message m = (Message) q.poll();
-
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                switch (m.getCode()) {
-
-                    case LOGOUT_RESPONSE:
-                        userStatusButton.setIcon(Utils.getIIcon("status/offline24.png"));
-                        break;
-                }
-            }
-        });
-
-    }
-
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        JMenuItem source = (JMenuItem) (e.getSource());
-        String newStatus = source.getActionCommand();
-        R.getU().setStatus(User.Status.valueOf(newStatus));
-
-        Message m = new Message(USER_STATUS_UPDATE, R.getU());
-        R.getNm().send(m);
-    }
-
     public void openInvitationPane() {
     }
 
-    public void addTab(String name, Icon JCHAT_LOGO, LoginTab tab, String toolTipText) {
-        tabbedPane.addTab(name, JCHAT_LOGO, tab, toolTipText);
-    }
+    @Override
+    public void update(Observable o, Object arg) {
+        q = (OQueue) o;
 
-    void changeUserStatusIcon(final String status) {
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                userStatusButton.setIcon(Utils.getIIcon("status/" + status + "24.png"));
-            }
-        });
+        if (!arg.equals(this.getClass().getSimpleName())) {
+            if (arg.equals(MessageType.NO_CONNECTION_BROADCAST)) {
+                setUserStatus(UserAccount.Status.OFFLINE);
+                setUserIconLabel(GuiUtils.getDefaultUserIcon());
+                m = q.peek();
+                GuiUtils.writeToTray((String) m.getContent(), trayArea);
 
-    }
-
-    class PopupListener extends MouseAdapter {
-
-        JPopupMenu popup;
-
-        PopupListener(JPopupMenu popupMenu) {
-            popup = popupMenu;
-        }
-
-        public void mousePressed(MouseEvent e) {
-            maybeShowPopup(e);
-        }
-
-        public void mouseReleased(MouseEvent e) {
-            maybeShowPopup(e);
-        }
-
-        private void maybeShowPopup(MouseEvent e) {
-            if (e.isPopupTrigger()) {
-                popup.show(e.getComponent(),
-                        e.getX(), e.getY());
+                getT().removeAll();
+                LoginTab loginTab = new LoginTab();
+                getT().addTab(loginTab.getName(), JCHAT_LOGO, loginTab, LOGIN_TAB_TIP);
             }
         }
     }
+
+    void setUserStatus(UserAccount.Status status) {
+        R.getUserAccount().setStatus(status);
+        GuiUtils.setStatus(status, userStatusButton, userIconLabel);
+    }
+
+    void setUserIconLabel(ImageIcon icon) {
+        userIconLabel.setIcon(icon);
+    }
+
+    void putInHistory(Notification notif) {
+        HISTORYPANE.addCell(new HistoryCell(notif));
+    }
+
+    void subscribeStandardTabs() {
+        NetworkManager.subscribe(NEWSPANE);
+        NetworkManager.subscribe(CONTACTSMODEL);
+        NetworkManager.subscribe(CONTACTSPANE);
+        //NetworkManager.subscribe(HISTORYPANE);
+        NetworkManager.subscribe(SETTINGSPANE);
+        NetworkManager.subscribe(ADDCONTACTSPANE);
+    }
+
 }

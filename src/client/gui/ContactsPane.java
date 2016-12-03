@@ -4,41 +4,53 @@
  */
 package client.gui;
 
-import client.pojos.R;
-import common.db.entity.Contact;
+import client.db.util.DB;
+import client.gui.utils.ContactsModel;
+import client.gui.utils.TableRenderers.EmailRenderer;
+import client.gui.utils.TableRenderers.IconRenderer;
+import client.gui.utils.TableRenderers.StatusRenderer;
+import client.gui.utils.TableRenderers.UsernameRenderer;
+import client.networking.NetworkManager;
+import client.networking.R;
 import common.db.entity.Conversation;
-import common.pojos.Conventions;
-import common.pojos.Message;
-import common.pojos.OQueue;
+import common.db.entity.UserAccount;
+import common.db.entity.UserContact;
+import common.utils.Conventions;
+import common.utils.Message;
+import common.utils.MessageType;
+import common.utils.OQueue;
+import common.utils.Utils;
+import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Observable;
 import java.util.Observer;
+import java.util.Set;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
-import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
+import javax.swing.table.TableColumnModel;
 
 /**
  *
  * @author johny
  */
-public class ContactsPane extends javax.swing.JPanel implements Observer, Conventions, TableRenderers, ActionListener {
-
-    private ContactsModel model;
-    private List<Conversation> tempConversations = new ArrayList<>();
+public class ContactsPane extends javax.swing.JPanel implements Observer, Conventions, ActionListener {
+    // 
 
     /**
      * Creates new form ContactsPane
+     *
+     * @param model
      */
-    public ContactsPane() {
-        model = new ContactsModel();
+    public ContactsPane(ContactsModel model) {
+        this.model = model;
         initComponents();
+
+        tempConvs = new ArrayList();
     }
 
     /**
@@ -51,15 +63,43 @@ public class ContactsPane extends javax.swing.JPanel implements Observer, Conven
     private void initComponents() {
 
         contactPopupMenu = new javax.swing.JPopupMenu();
+        startChatMenuItem = new javax.swing.JMenuItem();
+        videoCallMenuItem = new javax.swing.JMenuItem();
+        showContactMenuItem = new javax.swing.JMenuItem();
         deleteContactMenuItem = new javax.swing.JMenuItem();
         jLabel1 = new javax.swing.JLabel();
         jScrollPane1 = new javax.swing.JScrollPane();
         table = new javax.swing.JTable();
 
-        deleteContactMenuItem.setText("Remove contact");
+        contactPopupMenu.setBackground(java.awt.Color.white);
+
+        startChatMenuItem.setBackground(java.awt.Color.white);
+        startChatMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/text_chat/chat-icon24.png"))); // NOI18N
+        startChatMenuItem.setText("Chat");
+        startChatMenuItem.addActionListener(this);
+        contactPopupMenu.add(startChatMenuItem);
+
+        videoCallMenuItem.setBackground(startChatMenuItem.getBackground());
+        videoCallMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/video_chat/camera-red24.png"))); // NOI18N
+        videoCallMenuItem.setText("Video call");
+        videoCallMenuItem.setToolTipText("Coming soon...");
+        videoCallMenuItem.setEnabled(false);
+        videoCallMenuItem.addActionListener(this);
+        contactPopupMenu.add(videoCallMenuItem);
+
+        showContactMenuItem.setBackground(startChatMenuItem.getBackground());
+        showContactMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/showInfo/showinfo24.png"))); // NOI18N
+        showContactMenuItem.setText("Show info");
+        showContactMenuItem.addActionListener(this);
+        contactPopupMenu.add(showContactMenuItem);
+
+        deleteContactMenuItem.setBackground(startChatMenuItem.getBackground());
+        deleteContactMenuItem.setIcon(new javax.swing.ImageIcon(getClass().getResource("/icons/delete/delete16.png"))); // NOI18N
+        deleteContactMenuItem.setText("Delete");
         deleteContactMenuItem.addActionListener(this);
         contactPopupMenu.add(deleteContactMenuItem);
 
+        setBackground(java.awt.Color.white);
         setToolTipText("");
         setName("CONTACTSPANE"); // NOI18N
 
@@ -68,19 +108,28 @@ public class ContactsPane extends javax.swing.JPanel implements Observer, Conven
         jLabel1.setForeground(java.awt.Color.white);
         jLabel1.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         jLabel1.setText("My Contacts");
-        jLabel1.setBorder(null);
         jLabel1.setOpaque(true);
+
+        jScrollPane1.setBackground(java.awt.Color.white);
 
         table.setAutoCreateRowSorter(true);
         table.setModel(model);
+        TableColumnModel tcm = table.getColumnModel();
+        tcm.getColumn(model.findColumn("Icon")).setCellRenderer(new IconRenderer());
+        tcm.getColumn(model.findColumn("Username")).setCellRenderer(new UsernameRenderer());
+        tcm.getColumn(model.findColumn("Email")).setCellRenderer(new EmailRenderer());
+        tcm.getColumn(model.findColumn("Status")).setCellRenderer(new StatusRenderer());
+        table.setFocusable(false);
+        table.setIntercellSpacing(new Dimension(0,0));
         table.setName(""); // NOI18N
-        table.setShowHorizontalLines(false);
-        table.getTableHeader().setResizingAllowed(false);
-        table.getTableHeader().setReorderingAllowed(false);
-        table.addMouseListener(new PopupListener(contactPopupMenu));
-        table.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent evt) {
-                tableMouseClicked(evt);
+        table.setOpaque(false);
+        table.setRowHeight(48);
+        table.setSelectionBackground(new java.awt.Color(253, 203, 183));
+        table.setTableHeader(null);
+        table.addMouseListener(new client.gui.utils.PopupMenuListener(contactPopupMenu));
+        table.addMouseMotionListener(new java.awt.event.MouseMotionAdapter() {
+            public void mouseMoved(java.awt.event.MouseEvent evt) {
+                tableMouseMoved(evt);
             }
         });
         jScrollPane1.setViewportView(table);
@@ -97,54 +146,125 @@ public class ContactsPane extends javax.swing.JPanel implements Observer, Conven
             .addGroup(layout.createSequentialGroup()
                 .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 30, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(0, 0, 0)
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 540, Short.MAX_VALUE))
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 515, Short.MAX_VALUE)
+                .addGap(0, 0, 0))
         );
     }// </editor-fold>//GEN-END:initComponents
 
-    private void tableMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tableMouseClicked
+    private void tableMouseMoved(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tableMouseMoved
         Point click = evt.getPoint();
-        int rowClicked = table.rowAtPoint(click);
-        selectedContact = model.getContact(rowClicked);
+        rowHovered = table.rowAtPoint(click);
 
-        if (rowClicked == -1) {
-            return;
+        R.log("Table mouse hovers over row " + rowHovered);
+        if (rowHovered != -1) {
+            table.setRowSelectionInterval(rowHovered, rowHovered);
         }
 
+    }//GEN-LAST:event_tableMouseMoved
 
-        if (evt.getButton() == MouseEvent.BUTTON2) {
-        } else {
-
-            int colClicked = table.columnAtPoint(click);
-            // Col 2 = chat button, Col 3 = video button
-            if (colClicked != 2 && colClicked != 3) {
-                return;
-            }
-
-
-            if (selectedContact.getStatus() == Contact.Status.ONLINE) {
-                if (!selectedContact.isChatPaneOpened()) {
-                    //JPanel tab = findTabByContactId(contact.getId());
-                    // send conversation id request to server
-                    Conversation conv = new Conversation();
-                    conv.setClientGenId(R.getRandom().nextInt());
-                    Message m = new Message(CONVERSATION_ID_REQUEST, conv);
-                    R.getNm().send(m);
-                    // wait for response
-                    model.setValueAt(true, rowClicked, colClicked);
-                }
-
-            }
-        }
-
-    }//GEN-LAST:event_tableMouseClicked
     // Variables declaration - do not modify//GEN-BEGIN:variables
     private javax.swing.JPopupMenu contactPopupMenu;
     private javax.swing.JMenuItem deleteContactMenuItem;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JScrollPane jScrollPane1;
+    private javax.swing.JMenuItem showContactMenuItem;
+    private javax.swing.JMenuItem startChatMenuItem;
     private javax.swing.JTable table;
+    private javax.swing.JMenuItem videoCallMenuItem;
     // End of variables declaration//GEN-END:variables
-    private Contact selectedContact;
+    private UserAccount selectedContact;
+    private final ContactsModel model;
+    private final List<Conversation> tempConvs;
+    private static int rowHovered;
+
+    /**
+     * Listens for actions on the popup menu for each contact
+     *
+     * @param e
+     */
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        JMenuItem source = (JMenuItem) (e.getSource());
+        String action = source.getActionCommand();
+
+        selectedContact = model.getContact(rowHovered);
+        switch (action) {
+            case "Chat":
+                if (GuiUtils.showOnlineActionOnly(R.getMf())) {
+                    return;
+                }
+
+                // Check if contact is online
+                if (selectedContact.getStatus() == UserAccount.Status.OFFLINE) {
+                    return;
+                }
+
+                Conversation conv;
+                // Check if user has clicked the contact before and has not gotten a response yet              
+                for (Conversation tempConv : tempConvs) {
+                    Set<UserAccount> parts = tempConv.getParticipants();
+                    for (UserAccount part : parts) {
+                        if (part.getId().equals(selectedContact.getId())) {
+                            JOptionPane.showMessageDialog(this,
+                                    "Conversation is about to open.",
+                                    "Just a moment",
+                                    JOptionPane.PLAIN_MESSAGE);
+                            return;
+                        }
+                    }
+                }
+
+                // Check if there is an existing tab opened with this contact alone
+                // If not send conv_id_req
+                conv = R.getMf().getT().getOneOnOneConversation(selectedContact);
+                if (conv == null) {
+                    // No open 1-1 conversations with the selected contact
+                    conv = new Conversation();
+                    conv.setClientGenId(R.getRandom().nextInt());
+                    conv.getParticipants().add(R.getUserAccount());
+                    conv.getParticipants().add(selectedContact);
+                    tempConvs.add(conv);
+                    Message m = new Message(MessageType.NEW_CONVERSATION_REQ, conv);
+                    NetworkManager.send(m);
+                } else {
+                    R.getMf().getT().setSelectedConversation(conv.getServerGenId());
+                }
+                break;
+
+            case "Video call":
+                break;
+            case "Show info":
+                String s = Utils.getUserAccountString(selectedContact);
+                JOptionPane.showMessageDialog(this, s, "Contact info", JOptionPane.INFORMATION_MESSAGE);
+                break;
+            case "Delete":
+                if (GuiUtils.showOnlineActionOnly(R.getMf())) {
+                    return;
+                }
+
+                int choice = JOptionPane.showConfirmDialog(this,
+                        "Are you sure you want to remove "
+                        + selectedContact.getUsername()
+                        + " from your contacts?",
+                        "Delete Contact Confirmation",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.QUESTION_MESSAGE);
+
+                if (choice == JOptionPane.YES_OPTION) {
+                    Message m = new Message(MessageType.CONTACT_DELETION, selectedContact.getId());
+                    NetworkManager.send(m);
+                    model.remove(selectedContact);
+                    DB.delete(selectedContact);
+                    DB.delete(DB.getUserIcon(selectedContact.getId()));
+                    UserContact uc = DB.getUserContact(R.getUserAccount().getId(), selectedContact.getId());
+                    if (uc != null) {
+                        DB.delete(uc);
+                    }
+                }
+                break;
+        }
+
+    }
 
     @Override
     public void update(Observable o, Object arg) {
@@ -155,74 +275,37 @@ public class ContactsPane extends javax.swing.JPanel implements Observer, Conven
         OQueue q = (OQueue) o;
         final Message m = (Message) q.poll();
 
-        final Conversation conv = (Conversation) m.getContent();
-        for (Conversation tempConv : tempConversations) {
-            if (tempConv.getClientGenId() == conv.getClientGenId()) {
-                tempConversations.remove(tempConv);
-                break;
-            }
-        }
-
-
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
 
-                switch (m.getCode()) {
-                    case CONVERSATION_ID_RESPONSE:
-                        // open tab with conversation id from db
-                        ChatPane chatTab = new ChatPane(conv);
-                        R.getMf().getT().addTab(ACTIVE_TAB_TITLE, JCHAT_LOGO, chatTab, ACTIVE_TAB_TIP);
-                        R.getMf().getT().setSelectedComponent(chatTab);
-                        //HibernateUtil.setContactChatOpened()
+                switch (m.getType()) {
+                    case NEW_CONVERSATION_DELIVERY:
+                        Conversation incomingConv = (Conversation) m.getContent();
+
+                        // Open tab with conversation id from db        
+                        R.getMf().getT().addChatTab(incomingConv);
                         break;
+
                 }
             }
         });
 
+        switch (m.getType()) {
+            case NEW_CONVERSATION_DELIVERY:
+                Conversation incomingConv = (Conversation) m.getContent();
+
+                // Delete tempConv if it was started by me
+                for (Conversation tempConv : tempConvs) {
+                    if (tempConv.getClientGenId().equals(incomingConv.getClientGenId())) {
+                        tempConvs.remove(tempConv);
+                        break;
+                    }
+                }
+
+                break;
+        }
 
     }
 
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        JMenuItem source = (JMenuItem) (e.getSource());
-        //String contactCommand = source.getActionCommand();
-        Contact contactToRemove = selectedContact;
-
-        int confirmation = JOptionPane.showConfirmDialog(this,
-                "Are you sure you want to remove "
-                + contactToRemove.getUsernameOrEmail() + " from your contacts?",
-                "Remove Contact Confirmation",
-                JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
-
-
-        if (confirmation == JOptionPane.YES_OPTION) {
-            Message m = new Message(CONTACT_DELETION, contactToRemove);
-            R.getNm().send(m);
-        }
-    }
-
-    class PopupListener extends MouseAdapter {
-
-        JPopupMenu popup;
-
-        PopupListener(JPopupMenu popupMenu) {
-            popup = popupMenu;
-        }
-
-        public void mousePressed(MouseEvent e) {
-            maybeShowPopup(e);
-        }
-
-        public void mouseReleased(MouseEvent e) {
-            maybeShowPopup(e);
-        }
-
-        private void maybeShowPopup(MouseEvent e) {
-            if (e.isPopupTrigger()) {
-                popup.show(e.getComponent(),
-                        e.getX(), e.getY());
-            }
-        }
-    }
 }

@@ -1,92 +1,95 @@
 package client.networking;
 
-import common.pojos.Conventions;
-import common.pojos.Message;
-import common.pojos.Utils;
-import client.pojos.R;
+import common.db.entity.UserAccount;
+import common.utils.Conventions;
+import common.utils.Message;
+import common.utils.MessageType;
+import common.utils.Utils;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
 import javax.net.ssl.SSLSocket;
-import javax.swing.SwingWorker;
 
-public class NetworkSpeaker extends SwingWorker<Void, Boolean> implements Conventions {
+public class NetworkSpeaker implements Runnable, Conventions {
 
-    private SSLSocket sslSocket;
+    private final SSLSocket sslSocket;
     private OutputStream outputStream;
-    private BlockingQueue<Message> messagesToSend;
-    private String caller = this.getClass().getSimpleName();
     private ObjectOutputStream mout;
+    private final BlockingQueue<Message> messagesToSend;
+    private final String threadName = "NETWORK SPEAKER THREAD";
+    private volatile boolean needed;
+    private volatile Thread thisThread;
 
-    NetworkSpeaker(SSLSocket socket) {
+    NetworkSpeaker(SSLSocket socket, BlockingQueue msgsToNet) {
         sslSocket = socket;
-        try {
-            outputStream = sslSocket.getOutputStream();
-        } catch (IOException e) {
-            Utils.print(caller, e.toString());
-            e.printStackTrace();
-        }
-
-
-
-        try {
-            mout = new ObjectOutputStream(outputStream);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        try {
-            mout.flush();
-        } catch (IOException ex) {
-            Logger.getLogger(NetworkSpeaker.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        messagesToSend = new ArrayBlockingQueue<>(CLIENT_MSG_QUEUE_IN_CAPACITY);
+        messagesToSend = msgsToNet;
     }
 
     @Override
-    protected Void doInBackground() throws Exception {
+    public void run() {
 
-        Message msg;
-        boolean connectionIsNeeded = true;
+        try {
+            Thread.currentThread().setName(threadName);
+            thisThread = Thread.currentThread();
 
-        while (connectionIsNeeded) {
-            msg = messagesToSend.take();
-            R.log("Client NetworkSpeaker: I am gonna send :" + msg.getDescription());
+            outputStream = sslSocket.getOutputStream();
+            mout = new ObjectOutputStream(outputStream);
+            mout.flush();
 
-            if (msg != null) {
+            Message msg;
+            needed = true;
+            while (needed) {
+                R.log("Waiting for a message to be sent");
+
+                try {
+                    msg = messagesToSend.take();
+                } catch (InterruptedException ex) {
+                    R.log(ex.toString());
+                    close();
+                    return;
+                }
+
+                R.log("I am gonna send: " + msg.getType().toString());
+                if (msg.getContent() instanceof UserAccount) {
+                    R.log("The user object I send:\n");
+                    Utils.printInfo((UserAccount) msg.getContent());
+                }
                 mout.writeObject(msg);
                 mout.flush();
-                //Utils.print(caller, "Message written to bufferedWriter");
-                if (msg.getCode() == COMMUNICATION_TERMINATION_REQUEST) {
-                    connectionIsNeeded = false;
+                mout.reset();
+                R.log("Message is flushed");
+
+                if (msg.getType() == MessageType.LOGOUT_REQUEST) {
+                    NetworkManager.disconnect();
                 }
-            } else {
-                //Utils.print(caller, "Msg is null");
-                R.log("NetworkSpeaker: Msg is null");
+
+            }
+        } catch (IOException ex) {
+            R.log(ex.toString());
+            close();
+        }
+
+    }
+
+    public void stop() {
+        needed = false;
+        thisThread.interrupt();
+    }
+
+    private void close() {
+        if (mout != null) {
+            try {
+                mout.flush();
+                mout.reset();
+                mout.close();
+            } catch (IOException ex) {
+                R.log(ex.toString() + " WHILE CLOSING OBJECT OUTPUT STREAM");
             }
         }
-
-        mout.close();
-        return null;
+        NetworkManager.disconnect();
     }
 
-    /**
-     * Method used by NetworkManager puts messages that must be sent to the
-     * Server
-     *
-     * @param msg
-     */
-    void put(Message msg) {
-        //Utils.print(caller, "Gonna offer");
-        boolean space = messagesToSend.offer(msg);
-        if (space) {
-            R.log(caller + " There is space in the queue");
-        } else {
-            R.log(caller + " No space in the queue");
-        }
-    }
 }
